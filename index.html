@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VR Escape The Backrooms — Beta</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+        body { overflow: hidden; background: #090804; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        #boot-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: radial-gradient(circle at center, #29220a 0%, #090804 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
+            transition: opacity 0.5s ease;
+        }
+        #boot-overlay.hidden { opacity: 0; pointer-events: none; }
+        #boot-overlay h1 { color: #facc15; font-size: 26px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
+        #boot-overlay p { color: #d6d3d1; font-size: 13px; margin-bottom: 22px; text-align: center; max-width: 380px; }
+
+        .btn-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .vr-start-btn {
+            background: linear-gradient(135deg, #eab308, #ca8a04); color: #090804; border: none;
+            padding: 15px 28px; border-radius: 14px; font-size: 15px; font-weight: 900; cursor: pointer;
+            box-shadow: 0 8px 25px rgba(234, 179, 8, 0.4); transition: transform 0.2s;
+        }
+        .vr-start-btn:active { transform: scale(0.95); }
+        .vr-start-btn.alt { background: #1c1917; color: #facc15; border: 1px solid #facc15; box-shadow: none; }
+
+        #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+        #vr-divider { display: none; position: fixed; top: 0; bottom: 0; left: 50%; width: 3px; background: #000; transform: translateX(-50%); z-index: 20; }
+
+        #top-controls { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; z-index: 30; }
+        .hud-btn {
+            background: rgba(15, 13, 8, 0.82); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.4);
+            padding: 7px 12px; border-radius: 10px; font-size: 11.5px; font-weight: bold; cursor: pointer;
+        }
+
+        #coop-bar {
+            display: none; position: fixed; top: 48px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 13, 8, 0.9); border: 1px solid #facc15; border-radius: 12px;
+            padding: 8px 14px; pointer-events: auto; z-index: 35; color: white; font-size: 12px; align-items: center; gap: 8px;
+        }
+        #coop-bar input {
+            width: 75px; background: #292524; border: 1px solid #facc15; color: #facc15;
+            padding: 5px 8px; border-radius: 6px; font-weight: bold; text-align: center; outline: none; touch-action: auto;
+        }
+
+        #subtitle-box {
+            position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+            background: rgba(12, 10, 5, 0.82); color: #fef08a; padding: 9px 18px; border-radius: 12px;
+            font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid rgba(250, 204, 21, 0.25); z-index: 30; max-width: 90vw;
+        }
+
+        #beta-end-screen {
+            position: fixed; inset: 0; z-index: 150; background: rgba(5, 5, 3, 0.96);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px;
+            opacity: 0; pointer-events: none; transition: opacity 1.2s ease; text-align: center;
+        }
+        #beta-end-screen.visible { opacity: 1; pointer-events: auto; }
+        #beta-end-screen h2 { color: #facc15; font-size: 22px; line-height: 1.5; max-width: 540px; text-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
+        #beta-end-screen p { color: #a8a29e; font-size: 13px; margin-top: 16px; }
+
+        #sanity-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 15; transition: box-shadow 0.3s ease; }
+        #cam-video { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="boot-overlay">
+        <h1>VR Escape The Backrooms</h1>
+        <p>Разрешите доступ к камере и датчикам движения для отслеживания двух рук и поворотов головы в VR</p>
+        <div class="btn-group">
+            <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
+            <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
+        </div>
+    </div>
+
+    <div id="sanity-vignette"></div>
+    <div id="vr-divider"></div>
+
+    <div id="hud">
+        <div id="top-controls">
+            <button class="hud-btn" onclick="toggleStereo()">VR / 1 Экран</button>
+            <button class="hud-btn" onclick="recenterHead()">Центр головы</button>
+            <button class="hud-btn" onclick="returnToMenu()">В Меню</button>
+        </div>
+        <div id="coop-bar">
+            <span>Код комнаты: <b id="my-room-code">----</b></span>
+            <input type="text" id="join-code-input" placeholder="Код друга" maxlength="4">
+            <button class="hud-btn" onclick="joinFriendRoom()">Войти</button>
+        </div>
+        <div id="subtitle-box">Протяните руку к кнопке «ИГРАТЬ» перед вами</div>
+    </div>
+
+    <div id="beta-end-screen">
+        <h2>Спасибо за прохождение Бета-Теста игры VR Escape The Backrooms! В скором времени появится еще больше новых уровней! Еще раз спасибо, Удачи! Пока!</h2>
+        <p>Возврат в главное меню...</p>
+    </div>
+
+    <video id="cam-video" playsinline autoplay muted></video>
+
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+
+    <script>
+        const DB_URL = "https://" + "vrgamep-79dc0-default-rtdb" + ".firebaseio.com";
+
+        let isStereo = false, isBooted = false;
+        let currentState = "MENU";
+        let isCoop = false, roomCode = "", myPlayerId = "p_" + Math.floor(1000 + Math.random() * 9000);
+        let maxUnlockedLevel = parseInt(localStorage.getItem('backrooms_vr_save') || "0");
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x141106);
+        scene.fog = new THREE.FogExp2(0x181408, 0.042);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 120);
+        const playerRig = new THREE.Group();
+        playerRig.position.set(0, 1.65, 0);
+        playerRig.add(camera);
+        scene.add(playerRig);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setScissorTest(true);
+        document.body.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight));
+        function makeTex(type, labelText = "", bgHex = "#eab308", fgHex = "#090804") {
+            const c = document.createElement('canvas');
+            c.width = 256; c.height = 256;
+            const g = c.getContext('2d');
+
+            if (type === 'wallpaper') {
+                g.fillStyle = '#c8b458'; g.fillRect(0, 0, 256, 256);
+                g.fillStyle = '#b5a044';
+                for (let x = 0; x < 256; x += 32) {
+                    g.fillRect(x, 0, 6, 256);
+                    for (let y = 0; y < 256; y += 32) g.fillRect(x + 12, y + 8, 8, 14);
+                }
+                g.fillStyle = 'rgba(30,20,5,0.2)'; g.fillRect(0, 236, 256, 20);
+            } else if (type === 'carpet') {
+                g.fillStyle = '#8c7a38'; g.fillRect(0, 0, 256, 256);
+                for (let i = 0; i < 1200; i++) {
+                    g.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.12)' : 'rgba(255,240,180,0.08)';
+                    g.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
+                }
+            } else if (type === 'concrete') {
+                g.fillStyle = '#475569'; g.fillRect(0, 0, 256, 128);
+                g.fillStyle = '#94a3b8'; g.fillRect(0, 128, 256, 128);
+                g.fillStyle = '#1e293b'; g.fillRect(0, 124, 256, 8);
+            } else if (type === 'tile') {
+                g.fillStyle = '#cbd5e1'; g.fillRect(0, 0, 256, 256);
+                g.strokeStyle = '#94a3b8'; g.lineWidth = 3;
+                for (let i = 0; i <= 256; i += 64) { g.strokeRect(i, 0, 64, 256); g.strokeRect(0, i, 256, 64); }
+            } else if (type === 'gridDoor') {
+                g.fillStyle = '#e2e8f0'; g.fillRect(0, 0, 256, 256);
+                g.fillStyle = '#0f172a'; g.fillRect(24, 20, 208, 110);
+                g.strokeStyle = '#64748b'; g.lineWidth = 2;
+                for (let x = 24; x <= 232; x += 14) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 130); g.stroke(); }
+                for (let y = 20; y <= 130; y += 14) { g.beginPath(); g.moveTo(24, y); g.lineTo(232, y); g.stroke(); }
+            } else if (type === 'arrow') {
+                g.fillStyle = '#262626'; g.fillRect(0, 0, 256, 256);
+                g.fillStyle = '#09090b';
+                g.beginPath(); g.moveTo(40,110); g.lineTo(150,110); g.lineTo(150,75); g.lineTo(220,128); g.lineTo(150,181); g.lineTo(150,146); g.lineTo(40,146); g.fill();
+            } else if (type === 'sign') {
+                g.fillStyle = bgHex; g.fillRect(0, 0, 256, 256);
+                g.strokeStyle = fgHex; g.lineWidth = 10; g.strokeRect(10, 10, 236, 236);
+                g.fillStyle = fgHex; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+                g.fillText(labelText, 128, 128);
+            }
+
+            const t = new THREE.CanvasTexture(c);
+            t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
+            return t;
+        }
+
+        const texWall = makeTex('wallpaper'), texFloor = makeTex('carpet'), texConcrete = makeTex('concrete');
+        const texTile = makeTex('tile'), texGridDoor = makeTex('gridDoor'), texArrow = makeTex('arrow');
+
+        const leftHandMesh = new THREE.Group();
+        const rightHandMesh = new THREE.Group();
+        camera.add(leftHandMesh, rightHandMesh);
+
+        function buildHazmatHand(isRight) {
+            const grp = new THREE.Group();
+            const sleeveMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.6 });
+            const gloveMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 });
+
+            const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.055, 0.32, 12), sleeveMat);
+            forearm.rotation.x = Math.PI / 2; forearm.position.set(0, -0.02, 0.22);
+
+            const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.032, 0.10), gloveMat);
+            const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.08, 8), gloveMat);
+            finger.rotation.x = Math.PI / 2; finger.position.set(isRight ? -0.025 : 0.025, 0, -0.07);
+
+            if (isRight) {
+                const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 3.0, 6), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+                laser.rotation.x = Math.PI / 2; laser.position.set(-0.025, 0, -1.55);
+                laser.visible = false;
+                grp.add(laser);
+                grp.userData.laser = laser;
+
+                const band = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14), new THREE.MeshStandardMaterial({ color: 0x09090b }));
+                band.rotation.x = Math.PI / 2; band.position.set(0, -0.015, 0.10);
+                const barMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+                const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.025), barMat);
+                bar.position.set(0, 0.03, 0.10);
+                grp.add(band, bar);
+                grp.userData.sanityBar = bar;
+                grp.userData.sanityMat = barMat;
+            }
+            grp.add(forearm, palm, finger);
+            grp.userData.finger = finger;
+            return grp;
+        }
+
+        const lHandVis = buildHazmatHand(false), rHandVis = buildHazmatHand(true);
+        leftHandMesh.add(lHandVis); rightHandMesh.add(rHandVis);
+        leftHandMesh.position.set(-0.25, -0.22, -0.45);
+        rightHandMesh.position.set(0.25, -0.22, -0.45);
+
+        const beltGroup = new THREE.Group();
+        beltGroup.position.set(0, -0.75, 0);
+        playerRig.add(beltGroup);
+        const beltRing = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.025, 8, 24), new THREE.MeshStandardMaterial({ color: 0x111113 }));
+        beltRing.rotation.x = Math.PI / 2;
+        const beltWater = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+        beltWater.position.set(-0.26, -0.05, -0.08); beltWater.visible = false;
+        const beltItem = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.07), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+        beltItem.position.set(0.26, -0.06, -0.08); beltItem.visible = false;
+        beltGroup.add(beltRing, beltWater, beltItem);
+        function createHazmatFriendModel() {
+            const root = new THREE.Group();
+            const suitMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.65 });
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.1 });
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.21, 0.62, 12), suitMat);
+            torso.position.y = 1.22;
+            const bioSign = new THREE.Mesh(new THREE.RingGeometry(0.04, 0.08, 12), blackMat);
+            bioSign.position.set(0, 1.32, 0.225);
+
+            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 12), blackMat);
+            belt.position.y = 0.92;
+            const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.14, 0.08), blackMat);
+            pouch.position.set(0.22, 0.90, 0.06);
+
+            const hood = new THREE.Mesh(new THREE.SphereGeometry(0.165, 14, 14), suitMat);
+            hood.position.set(0, 1.70, -0.01);
+            const mask = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 12), blackMat);
+            mask.position.set(0, 1.68, 0.04);
+            const eyeL = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.02, 10), glassMat);
+            eyeL.rotation.x = Math.PI / 2; eyeL.position.set(-0.045, 1.71, 0.165);
+            const eyeR = eyeL.clone(); eyeR.position.x = 0.045;
+            const filterL = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10), blackMat);
+            filterL.rotation.x = Math.PI / 2; filterL.position.set(-0.065, 1.63, 0.16);
+            const filterR = filterL.clone(); filterR.position.x = 0.065;
+
+            const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 10), suitMat);
+            armL.position.set(-0.28, 1.22, 0);
+            const gloveL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), blackMat);
+            gloveL.position.set(-0.28, 0.94, 0);
+            const armR = armL.clone(); armR.position.x = 0.28;
+            const gloveR = gloveL.clone(); gloveR.position.x = 0.28;
+
+            const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.085, 0.82, 10), suitMat);
+            legL.position.set(-0.11, 0.45, 0);
+            const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.26), blackMat);
+            bootL.position.set(-0.11, 0.08, 0.04);
+            const legR = legL.clone(); legR.position.x = 0.11;
+            const bootR = bootL.clone(); bootR.position.x = 0.11;
+
+            root.add(torso, bioSign, belt, pouch, hood, mask, eyeL, eyeR, filterL, filterR, armL, gloveL, armR, gloveR, legL, bootL, legR, bootR);
+            root.userData = { legL, legR, armL, armR, targetPos: new THREE.Vector3(), targetYaw: 0, walkPhase: 0 };
+            return root;
+        }
+
+        const friendMesh = createHazmatFriendModel();
+        friendMesh.visible = false;
+        scene.add(friendMesh);
+
+        let eventSource = null;
+        function connectToRoomStream(code) {
+            if (eventSource) eventSource.close();
+            eventSource = new EventSource(`${DB_URL}/rooms/${code}/players.json`);
+            const applyData = (data) => {
+                if (!data) return;
+                for (let [pid, pdata] of Object.entries(data)) {
+                    if (pid !== myPlayerId && pdata && pdata.x !== undefined) {
+                        friendMesh.visible = true;
+                        friendMesh.userData.targetPos.set(pdata.x, pdata.y, pdata.z);
+                        friendMesh.userData.targetYaw = pdata.yaw || 0;
+                        friendMesh.userData.isWalking = pdata.walking || false;
+                    }
+                }
+            };
+            eventSource.addEventListener('put', (e) => { const msg = JSON.parse(e.data); if (msg && msg.data) applyData(msg.data); });
+            eventSource.addEventListener('patch', (e) => { const msg = JSON.parse(e.data); if (msg && msg.data) applyData(msg.data); });
+        }
+
+        setInterval(() => {
+            if (!isCoop || !roomCode || !isBooted) return;
+            fetch(`${DB_URL}/rooms/${roomCode}/players/${myPlayerId}.json`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    x: playerRig.position.x, y: playerRig.position.y - 1.65, z: playerRig.position.z,
+                    yaw: gyroYaw + yawOffset, walking: (leftGesture === "POINT" || leftGesture === "VICTORY"), level: currentState
+                })
+            }).catch(() => {});
+        }, 120);
+
+        let leftGesture = "NONE", rightGesture = "NONE", cursorMode = false, lastThumbTime = 0, handNearMouth = false;
+
+        function classifyHand(lm) {
+            const thumbUp = lm.at(4).y < lm.at(3).y && lm.at(8).y > lm.at(6).y && lm.at(12).y > lm.at(10).y;
+            const iOpen = lm.at(8).y < lm.at(6).y;
+            const mOpen = lm.at(12).y < lm.at(10).y;
+            const rOpen = lm.at(16).y < lm.at(14).y;
+            const pOpen = lm.at(20).y < lm.at(18).y;
+
+            if (thumbUp && !iOpen && !mOpen) return "THUMB";
+            if (!iOpen && !mOpen && !rOpen && !pOpen) return "FIST";
+            if (iOpen && !mOpen && !rOpen && !pOpen) return "POINT";
+            if (iOpen && mOpen && !rOpen && !pOpen) return "VICTORY";
+            if (iOpen && mOpen && rOpen && pOpen) return "OPEN";
+            return "NONE";
+        }
+
+        async function startHandTracking() {
+            const video = document.getElementById('cam-video');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
+                video.srcObject = stream;
+                const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
+                hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+                hands.onResults((res) => {
+                    leftGesture = "NONE"; rightGesture = "NONE"; handNearMouth = false;
+                    if (res.multiHandLandmarks && res.multiHandedness) {
+                        for (let i = 0; i < res.multiHandLandmarks.length; i++) {
+                            const lm = res.multiHandLandmarks[i];
+                            const side = res.multiHandedness[i].label;
+                            const gest = classifyHand(lm);
+                            const hx = (0.5 - lm.at(9).x) * 0.95;
+                            const hy = (0.5 - lm.at(9).y) * 0.75 - 0.15;
+                            const size = Math.hypot(lm.at(0).x - lm.at(9).x, lm.at(0).y - lm.at(9).y);
+
+                            if (side === "Left") {
+                                leftGesture = gest;
+                                leftHandMesh.position.set(hx, hy, -0.45);
+                                lHandVis.userData.finger.visible = (gest === "POINT" || gest === "VICTORY" || gest === "OPEN");
+                            } else {
+                                rightGesture = gest;
+                                rightHandMesh.position.set(hx, hy, size > 0.34 ? -0.18 : -0.45);
+                                if (size > 0.34) handNearMouth = true;
+
+                                if (gest === "THUMB" && Date.now() - lastThumbTime > 1000) {
+                                    lastThumbTime = Date.now();
+                                    cursorMode = !cursorMode;
+                                    rHandVis.userData.laser.visible = cursorMode;
+                                    setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН: можно идти.");
+                                }
+                            }
+                        }
+                    }
+                });
+                const pump = async () => { if (video.readyState >= 2) await hands.send({ image: video }); requestAnimationFrame(pump); };
+                pump();
+            } catch (e) {}
+        }
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        let interactiveButtons = []; // 3D-кнопки в мире (меню, лобби, панель лифта, компьютер)
+        let worldItems = [];         // Предметы для сбора в правый кулак (лестница, ключи, вода)
+        let activeLevelData = {};    // Переменные текущего уровня
+
+        function setSubtitle(text) {
+            document.getElementById('subtitle-box').innerText = text;
+        }
+
+        function clearWorld() {
+            while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
+            interactiveButtons = [];
+            worldItems = [];
+            activeLevelData = {};
+            beltItem.visible = false;
+        }
+
+        function create3DButton(x, y, z, w, h, label, bgHex, fgHex, onClickAction, rotY = 0) {
+            const mat = new THREE.MeshStandardMaterial({ map: makeTex('sign', label, bgHex, fgHex), roughness: 0.4 });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.12), mat);
+            mesh.position.set(x, y, z);
+            mesh.rotation.y = rotY;
+            worldGroup.add(mesh);
+            const btnObj = { mesh, action: onClickAction, cooldown: 0 };
+            interactiveButtons.push(btnObj);
+            return btnObj;
+        }
+
+        function buildWall(x, y, z, w, h, d, mat) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            m.position.set(x, y, z);
+            worldGroup.add(m);
+            return m;
+        }
+
+        // 1. 3D VR-МЕНЮ В ЖЁЛТОМ ЛАБИРИНТЕ
+        function loadMenuScene() {
+            clearWorld();
+            currentState = "MENU";
+            scene.fog = new THREE.FogExp2(0x181408, 0.04);
+            playerRig.position.set(0, 1.65, 2.5);
+            document.getElementById('coop-bar').style.display = 'none';
+
+            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
+            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
+            buildWall(0, -0.1, 0, 16, 0.2, 16, fMat);
+            buildWall(0, 3.3, 0, 16, 0.2, 16, wMat);
+            buildWall(0, 1.6, -4, 16, 3.2, 0.4, wMat);
+            buildWall(0, 1.6, 5, 16, 3.2, 0.4, wMat);
+            buildWall(-5, 1.6, 0, 0.4, 3.2, 16, wMat);
+            buildWall(5, 1.6, 0, 0.4, 3.2, 16, wMat);
+
+            const light = new THREE.PointLight(0xfef08a, 1.2, 15);
+            light.position.set(0, 2.8, 1);
+            worldGroup.add(light);
+
+            // Объёмная 3D-кнопка "ИГРАТЬ" прямо перед игроком
+            create3DButton(0, 1.55, 0.8, 1.3, 0.55, "ИГРАТЬ", "#eab308", "#090804", () => {
+                loadLobbyScene();
+            });
+            setSubtitle("Коснитесь рукой 3D-кнопки «ИГРАТЬ» перед вами");
+        }
+
+        // 2. КОМНАТА-ЛОББИ (Одиночная / С другом по коду / Слоты сохранений)
+        function loadLobbyScene() {
+            clearWorld();
+            currentState = "LOBBY";
+            playerRig.position.set(0, 1.65, 3.2);
+            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
+            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
+
+            buildWall(0, -0.1, 0, 18, 0.2, 18, fMat);
+            buildWall(0, 3.3, 0, 18, 0.2, 18, wMat);
+            buildWall(0, 1.6, -4.5, 18, 3.2, 0.4, wMat);
+            buildWall(-6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
+            buildWall(6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
+            worldGroup.add(new THREE.PointLight(0xfef08a, 1.2, 18));
+
+            // Выбор режима: Одиночная или С другом
+            create3DButton(-1.5, 2.1, -1.5, 1.8, 0.55, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
+                isCoop = false;
+                document.getElementById('coop-bar').style.display = 'none';
+                setSubtitle("Выбран одиночный режим. Нажмите на сохранение уровня ниже!");
+            });
+
+            create3DButton(1.5, 2.1, -1.5, 1.8, 0.55, "С ДРУГОМ (CO-OP)", "#38bdf8", "#090804", () => {
+                isCoop = true;
+                if (!roomCode) roomCode = String(Math.floor(1000 + Math.random() * 9000));
+                document.getElementById('my-room-code').innerText = roomCode;
+                document.getElementById('coop-bar').style.display = 'flex';
+                connectToRoomStream(roomCode);
+                setSubtitle(`Комната создана! Код для друга: ${roomCode}. Выберите уровень.`);
+            });
+
+            // Слоты сохранений (Уровни 0 - 4)
+            const levels = [
+                { id: 0, name: "УР.0: ЛОББИ", fn: loadLevel0 },
+                { id: 1, name: "УР.1: МАШИНЫ", fn: loadLevel1 },
+                { id: 2, name: "УР.2: КОЖЕКРАД", fn: loadLevel2 },
+                { id: 3, name: "УР.3: ТЕМНОТА", fn: loadLevel3 },
+                { id: 4, name: "УР.4: УЛЫБАШКИ", fn: loadLevel4 }
+            ];
+
+            levels.forEach((lvl, idx) => {
+                const unlocked = idx <= maxUnlockedLevel;
+                create3DButton(-3.2 + idx * 1.6, 1.15, -1.5, 1.4, 0.5, unlocked ? lvl.name : "ЗАКРЫТО", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
+                    if (unlocked) lvl.fn();
+                    else setSubtitle("Сначала пройдите предыдущий уровень!");
+                });
+            });
+            setSubtitle("Лобби: выберите режим (Один / С другом) и нажмите на уровень");
+        }
+
+        function joinFriendRoom() {
+            const code = document.getElementById('join-code-input').value.trim();
+            if (code.length === 4) {
+                isCoop = true;
+                roomCode = code;
+                document.getElementById('my-room-code').innerText = roomCode;
+                connectToRoomStream(roomCode);
+                setSubtitle(`Вы подключились к комнате друга: ${roomCode}!`);
+            }
+        }
+        function unlockLevel(lvlNum) {
+            if (lvlNum > maxUnlockedLevel) {
+                maxUnlockedLevel = lvlNum;
+                localStorage.setItem('backrooms_vr_save', String(maxUnlockedLevel));
+            }
+        }
+
+        function spawnWorldItem(type, x, y, z, colorHex = 0x92400e) {
+            let mesh;
+            if (type === 'water') mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.24, 10), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
+            else if (type === 'key') mesh = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 8, 14), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            else mesh = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.14, 0.14), new THREE.MeshStandardMaterial({ color: colorHex }));
+            mesh.position.set(x, y, z);
+            worldGroup.add(mesh);
+            worldItems.push({ type, mesh, taken: false });
+            return mesh;
+        }
+
+        function loadLevel0() {
+            clearWorld();
+            currentState = "LEVEL_0";
+            playerRig.position.set(0, 1.65, 0);
+            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
+            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
+            const aMat = new THREE.MeshStandardMaterial({ map: texArrow });
+
+            buildWall(0, -0.1, -5, 26, 0.2, 18, fMat);
+            buildWall(-6, -0.1, -18, 10, 0.2, 8, fMat);
+            buildWall(6, -0.1, -18, 10, 0.2, 8, fMat);
+            buildWall(0, -0.1, -15, 2, 0.2, 2, fMat);
+            buildWall(0, -0.1, -21, 2, 0.2, 2, fMat);
+            buildWall(0, 3.3, -10, 32, 0.2, 32, wMat);
+
+            buildWall(0, 1.6, 3.5, 22, 3.2, 0.4, wMat);
+            buildWall(-11, 1.6, -9, 0.4, 3.2, 26, wMat);
+            buildWall(11, 1.6, -9, 0.4, 3.2, 26, wMat);
+            buildWall(-4, 1.6, -4, 0.4, 3.2, 8, wMat);
+            buildWall(4, 1.6, -5, 0.4, 3.2, 7, wMat);
+
+            buildWall(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, wMat);
+            buildWall(-3.2, 1.0, -13.5, 2.0, 2.0, 0.5, wMat);
+            buildWall(-3.2, 2.9, -13.5, 2.0, 0.6, 0.5, wMat);
+            buildWall(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x09090b }));
+            buildWall(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, wMat);
+
+            const door0 = buildWall(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+            const steps = [];
+            for (let i = 0; i < 3; i++) {
+                const s = buildWall(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, new THREE.MeshStandardMaterial({ color: 0x78350f }));
+                s.visible = false; steps.push(s);
+            }
+
+            buildWall(0, -4.2, -18, 28, 0.3, 24, fMat);
+            buildWall(0, -2.6, -14, 26, 3.2, 0.4, wMat);
+            buildWall(0, -2.6, -22, 26, 3.2, 0.4, wMat);
+            buildWall(-3, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
+            buildWall(4, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
+            buildWall(11.5, -3.2, -18, 2.5, 1.8, 2.5, new THREE.MeshStandardMaterial({ color: 0x57534e }));
+
+            const bac = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x09090b }));
+            bac.position.set(-10, -3.0, -18); bac.visible = false; worldGroup.add(bac);
+
+            worldGroup.add(new THREE.PointLight(0xfef08a, 1.1, 25));
+            spawnWorldItem('ladder', -7.5, 0.2, -1.5);
+            spawnWorldItem('ladder', 7.5, 0.2, -8.5);
+            spawnWorldItem('ladder', 1.2, 0.2, -2.0);
+            spawnWorldItem('key', -3.2, 2.25, -13.4);
+            spawnWorldItem('water', -7.0, 0.2, -9.0);
+
+            activeLevelData = { steps, placed: 0, door0, doorOpen: false, inPit: false, bac };
+            setSubtitle("Уровень 0: Соберите 3 части лестницы (кулак ✊) под квадратную дыру в стене");
+        }
+
+        function loadLevel1() {
+            unlockLevel(1);
+            clearWorld();
+            currentState = "LEVEL_1";
+            playerRig.position.set(0, 1.65, 8);
+            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
+            buildWall(0, -0.1, -6, 24, 0.2, 34, new THREE.MeshStandardMaterial({ color: 0x334155 }));
+            buildWall(0, 3.4, -6, 24, 0.2, 34, cMat);
+            buildWall(0, 1.6, 10, 24, 3.2, 0.4, cMat);
+            buildWall(0, 1.6, -22, 24, 3.2, 0.4, cMat);
+            worldGroup.add(new THREE.PointLight(0xe2e8f0, 1.0, 35));
+
+            const colors = [
+                { name: "КРАСНЫЙ", hex: "#ef4444", num: 0xef4444 },
+                { name: "СИНИЙ", hex: "#3b82f6", num: 0x3b82f6 },
+                { name: "ЗЕЛЁНЫЙ", hex: "#22c55e", num: 0x22c55e },
+                { name: "ЖЁЛТЫЙ", hex: "#eab308", num: 0xeab308 }
+            ].sort(() => Math.random() - 0.5);
+
+            const positions = [[-7, 4], [7, 4], [-7, -4], [7, -4], [-7, -12], [7, -12]];
+            let carIdx = 0;
+            positions.forEach(([bx, bz], i) => {
+                buildWall(bx, 1.6, bz - 2.5, 6, 3.2, 0.3, cMat);
+                buildWall(bx, 1.6, bz + 2.5, 6, 3.2, 0.3, cMat);
+                if (i === 1 || i === 4) {
+                    buildWall(bx, 0.7, bz, 3.6, 1.2, 1.9, new THREE.MeshStandardMaterial({ color: 0x64748b }));
+                } else if (carIdx < 4) {
+                    const col = colors[carIdx];
+                    buildWall(bx, 0.65, bz, 3.6, 1.1, 1.8, new THREE.MeshStandardMaterial({ color: col.num }));
+                    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), makeTex('sign', `№${carIdx + 1}`, "#0f172a", col.hex));
+                    sign.position.set(bx > 0 ? bx - 2.8 : bx + 2.8, 1.8, bz);
+                    sign.rotation.y = bx > 0 ? -Math.PI / 2 : Math.PI / 2;
+                    worldGroup.add(sign);
+                    carIdx++;
+                }
+            });
+
+            const enteredCode = [];
+            colors.forEach((c, idx) => {
+                create3DButton(-1.8 + idx * 1.2, 1.5, -21.6, 1.0, 0.5, c.name, c.hex, "#ffffff", () => {
+                    enteredCode.push(c.name);
+                    setSubtitle(`Введён цвет: ${c.name} (${enteredCode.length}/4)`);
+                    if (enteredCode.length === 4) {
+                        const ok = enteredCode.every((val, k) => val === colors[k].name);
+                        if (ok) {
+                            setSubtitle("КОД ВЕРНЫЙ! Лифт поднимает вас на Уровень 2 (Кожекрад)...");
+                            setTimeout(loadLevel2, 1500);
+                        } else {
+                            enteredCode.length = 0;
+                            setSubtitle("НЕВЕРНЫЙ КОД! Попробуйте ввести 4 цвета заново.");
+                        }
+                    }
+                });
+            });
+
+            spawnWorldItem('water', 0, 0.2, 0);
+            setSubtitle("Уровень 1: Найдите 4 открытые машины в комнатах (№1-№4) и введите цвета у лифта (👍 -> ☝️)");
+        }
+        function loadLevel2() {
+            unlockLevel(2);
+            clearWorld();
+            currentState = "LEVEL_2";
+            playerRig.position.set(0, 1.65, 9);
+            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
+            const gMat = new THREE.MeshStandardMaterial({ map: texGridDoor });
+            const tMat = new THREE.MeshStandardMaterial({ map: texTile });
+
+            buildWall(0, -0.1, -5, 24, 0.2, 32, new THREE.MeshStandardMaterial({ color: 0x334155 }));
+            buildWall(0, 3.4, -5, 24, 0.2, 32, cMat);
+            worldGroup.add(new THREE.PointLight(0xe2e8f0, 0.85, 30));
+
+            const keySpots = [[-7, 4],, [-7, -4], [7, -4], [-7, -11]];
+            keySpots.forEach(([kx, kz]) => {
+                buildWall(kx, 1.6, kz - 2.2, 5, 3.2, 0.3, cMat);
+                buildWall(kx, 1.6, kz + 2.2, 5, 3.2, 0.3, cMat);
+                buildWall(kx > 0 ? kx - 2.4 : kx + 2.4, 1.3, kz + 1.2, 0.15, 2.6, 1.4, gMat);
+                spawnWorldItem('key', kx, 0.4, kz);
+            });
+
+            buildWall(0, 0.01, -18, 8, 0.2, 6, tMat);
+            const airlockOuterDoor = buildWall(0, 1.4, -15, 2.0, 2.8, 0.2, gMat);
+            buildWall(0, 1.4, -21, 1.6, 2.6, 0.25, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            let airlockClosed = false;
+
+            create3DButton(-1.6, 1.5, -15.3, 1.0, 0.45, "ЗАКРЫТЬ ШЛЮЗ", "#ef4444", "#ffffff", () => {
+                airlockClosed = true;
+                airlockOuterDoor.position.x = 0;
+                setSubtitle("Вход в шлюз закрыт! Кожекрад не достанет.");
+            });
+
+            create3DButton(1.4, 1.5, -20.7, 1.2, 0.5, "ГЕРМОДВЕРЬ (5 КЛ.)", "#22c55e", "#ffffff", () => {
+                if (activeLevelData.keysCollected >= 5) {
+                    setSubtitle("Все 5 замков провернуты! Переход на Тёмную двухэтажную парковку...");
+                    setTimeout(loadLevel3, 1500);
+                } else {
+                    setSubtitle(`Нужно 5 ключей из комнат! Собрано: ${activeLevelData.keysCollected}/5`);
+                }
+            });
+
+            const skinStealer = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 2.1, 10), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
+            skinStealer.position.set(5, 1.05, -8);
+            worldGroup.add(skinStealer);
+
+            activeLevelData = { keysCollected: 0, skinStealer, airlockClosed: () => airlockClosed };
+            setSubtitle("Уровень 2: Соберите 5 ключей в комнатах с сеткой и укройтесь от Кожекрада в шлюзе!");
+        }
+
+        function loadLevel3() {
+            unlockLevel(3);
+            clearWorld();
+            currentState = "LEVEL_3";
+            playerRig.position.set(0, 1.65, 8);
+            scene.fog = new THREE.FogExp2(0x050507, 0.11);
+            const cMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+
+            buildWall(0, -0.1, -6, 22, 0.2, 30, cMat);
+            buildWall(0, 3.2, -6, 22, 0.2, 30, cMat);
+            create3DButton(7.5, 1.5, -18, 1.4, 0.8, "ЛИФТ НАВЕРХ", "#eab308", "#090804", () => {
+                scene.fog = new THREE.FogExp2(0x181408, 0.042);
+                loadLevel4();
+            });
+            spawnWorldItem('water', -4, 0.2, -2);
+            setSubtitle("Уровень 3: Очень тёмная парковка. Найдите в темноте кнопку лифта наверх!");
+        }
+
+        function loadLevel4() {
+            unlockLevel(4);
+            clearWorld();
+            currentState = "LEVEL_4";
+            playerRig.position.set(0, 1.65, 10);
+            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
+
+            buildWall(0, -0.1, -8, 26, 0.2, 38, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            const ceilingLight = new THREE.PointLight(0xffffff, 1.1, 40);
+            ceilingLight.position.set(0, 3.1, -8);
+            worldGroup.add(ceilingLight);
+
+            const gate = buildWall(0, 1.6, 4, 8, 3.2, 0.3, new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            let gateUnlocked = false;
+            create3DButton(-7.5, 1.5, 6, 1.4, 0.6, "ПК: ОТКРЫТЬ ВОРОТА", "#38bdf8", "#090804", () => {
+                gateUnlocked = true;
+                gate.visible = false;
+                setSubtitle("Доступ разрешён! Ворота открыты. Осторожно: в зале мигает свет и бегают Улыбашки!");
+            });
+
+            for (let i = 1; i <= 5; i++) {
+                const colZ = 1 - i * 4.2;
+                buildWall(-3.5, 1.6, colZ, 1.4, 3.2, 1.4, cMat);
+                const numSign = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), makeTex('sign', String(i), "#334155", "#ffffff"));
+                numSign.position.set(-3.5, 2.0, colZ + 0.72);
+                worldGroup.add(numSign);
+            }
+
+            buildWall(5, 1.6, -16, 6, 3.2, 6, new THREE.MeshStandardMaterial({ color: 0x334155, transparent: true, opacity: 0.35 }));
+            buildWall(5, 1.4, -18.8, 1.5, 2.6, 0.2, new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+
+            const smiler = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), makeTex('sign', ":)", "#000000", "#ffffff"));
+            smiler.position.set(3, 1.5, -6);
+            worldGroup.add(smiler);
+
+            activeLevelData = { ceilingLight, smiler, gateUnlocked: () => gateUnlocked, betaFinished: false };
+            setSubtitle("Уровень 4: Подойдите к воротам, затем разрешите открытие на ПК в Хабе слева!");
+        }
+        let gyroYaw = 0, gyroPitch = 0, gyroRoll = 0, yawOffset = 0;
+        let sanity = 100, speedBoost = 0, heldItem = null, beltHasWater = false;
+
+        window.addEventListener('deviceorientation', (e) => {
+            if (e.alpha === null) return;
+            gyroYaw = THREE.MathUtils.degToRad(e.alpha);
+            gyroPitch = THREE.MathUtils.degToRad(e.beta - 90);
+            gyroRoll = THREE.MathUtils.degToRad(e.gamma);
+        });
+
+        let drag = false, px = 0, py = 0;
+        window.addEventListener('pointerdown', (e) => { if (isBooted) { drag = true; px = e.clientX; py = e.clientY; } });
+        window.addEventListener('pointermove', (e) => {
+            if (!drag || !isBooted) return;
+            yawOffset -= (e.clientX - px) * 0.006;
+            gyroPitch = Math.max(-1.2, Math.min(1.2, gyroPitch - (e.clientY - py) * 0.005));
+            px = e.clientX; py = e.clientY;
+        });
+        window.addEventListener('pointerup', () => { drag = false; });
+
+        function recenterHead() { yawOffset = -gyroYaw; }
+        function toggleStereo() {
+            isStereo = !isStereo;
+            document.getElementById('vr-divider').style.display = isStereo ? 'block' : 'none';
+        }
+        function returnToMenu() {
+            document.getElementById('beta-end-screen').classList.remove('visible');
+            loadMenuScene();
+        }
+
+        async function bootVR(stereoMode) {
+            isStereo = stereoMode;
+            document.getElementById('vr-divider').style.display = stereoMode ? 'block' : 'none';
+            document.getElementById('boot-overlay').classList.add('hidden');
+            document.getElementById('hud').style.display = 'block';
+
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
+            }
+            await startHandTracking();
+            isBooted = true;
+            loadMenuScene();
+        }
+
+        function updateWorld() {
+            if (!isBooted) return;
+
+            const totalYaw = gyroYaw + yawOffset;
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = totalYaw;
+            camera.rotation.x = Math.max(-1.3, Math.min(1.3, gyroPitch));
+            camera.rotation.z = -gyroRoll * 0.5;
+
+            const leanSide = Math.sin(gyroRoll) * 0.42;
+            const leanFwd = Math.max(-0.2, Math.sin(-gyroPitch) * 0.35);
+            const crouch = gyroPitch < -0.65 ? -0.65 : 0;
+            camera.position.set(
+                Math.cos(totalYaw) * leanSide - Math.sin(totalYaw) * leanFwd,
+                crouch - Math.abs(leanSide) * 0.15,
+                -Math.sin(totalYaw) * leanSide - Math.cos(totalYaw) * leanFwd
+            );
+
+            if (friendMesh.visible) {
+                friendMesh.position.lerp(friendMesh.userData.targetPos, 0.18);
+                friendMesh.rotation.y += (friendMesh.userData.targetYaw - friendMesh.rotation.y) * 0.18;
+                if (friendMesh.userData.isWalking) {
+                    friendMesh.userData.walkPhase += 0.15;
+                    const s = Math.sin(friendMesh.userData.walkPhase) * 0.45;
+                    friendMesh.userData.legL.rotation.x = s;
+                    friendMesh.userData.legR.rotation.x = -s;
+                }
+            }
+
+            if (!cursorMode && (leftGesture === "POINT" || leftGesture === "VICTORY")) {
+                const spd = (leftGesture === "VICTORY" ? 0.085 : 0.045) * (speedBoost > 0 ? 1.35 : 1.0);
+                playerRig.position.x -= Math.sin(totalYaw) * spd;
+                playerRig.position.z -= Math.cos(totalYaw) * spd;
+            }
+
+            const handWorldPos = new THREE.Vector3();
+            rightHandMesh.getWorldPosition(handWorldPos);
+            for (let btn of interactiveButtons) {
+                if (btn.cooldown > 0) { btn.cooldown--; continue; }
+                const dist = handWorldPos.distanceTo(btn.mesh.position);
+                if (dist < 0.85 || (cursorMode && dist < 3.2 && rightGesture === "POINT")) {
+                    btn.cooldown = 45;
+                    btn.action();
+                }
+            }
+
+            if (rightGesture === "FIST" && !heldItem) {
+                for (let it of worldItems) {
+                    if (!it.taken && playerRig.position.distanceTo(it.mesh.position) < 2.2) {
+                        if (it.type === 'key' && currentState === "LEVEL_0" && activeLevelData.placed < 3) {
+                            setSubtitle("Слишком высоко! Сначала соберите 3 части лестницы под нишей.");
+                            continue;
+                        }
+                        it.taken = true; it.mesh.visible = false;
+                        if (it.type === 'water') {
+                            heldItem = 'water'; beltHasWater = true; beltWater.visible = true;
+                            setSubtitle("Миндальная вода в руке! Поднесите руку близко к камере/рту, чтобы выпить.");
+                        } else if (it.type === 'key' && currentState === "LEVEL_2") {
+                            activeLevelData.keysCollected++;
+                            setSubtitle(`Ключ собран (${activeLevelData.keysCollected}/5)!`);
+                        } else {
+                            heldItem = it.type; beltItem.visible = true;
+                            setSubtitle(it.type === 'ladder' ? "Часть лестницы на поясе! Раскройте ладонь 🖐️ под нишей." : "Ключ на поясе! Подойдите к двери.");
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if ((heldItem === 'water' || beltHasWater) && handNearMouth) {
+                heldItem = null; beltHasWater = false; beltWater.visible = false;
+                sanity = Math.min(100, sanity + 45); speedBoost = 500;
+                setSubtitle("Вы выпили Миндальную воду! Рассудок восстановлен.");
+            }
+            if (currentState === "LEVEL_0") {
+                if (rightGesture === "OPEN" && heldItem === 'ladder' && Math.hypot(playerRig.position.x + 3.2, playerRig.position.z + 12.5) < 2.8) {
+                    activeLevelData.steps[activeLevelData.placed].visible = true;
+                    activeLevelData.placed++; heldItem = null; beltItem.visible = false;
+                    setSubtitle(`Ступенька установлена (${activeLevelData.placed}/3)!`);
+                }
+                if (heldItem === 'key' && !activeLevelData.doorOpen && Math.hypot(playerRig.position.x + 1.5, playerRig.position.z + 13.0) < 2.2) {
+                    activeLevelData.doorOpen = true; heldItem = null; beltItem.visible = false;
+                    activeLevelData.door0.visible = false;
+                    setSubtitle("Дверь открыта! Впереди квадратная яма в полу...");
+                }
+                if (!activeLevelData.inPit && activeLevelData.doorOpen && Math.abs(playerRig.position.x) < 1.2 && Math.abs(playerRig.position.z + 18) < 1.2) {
+                    activeLevelData.inPit = true; playerRig.position.y = -2.35; activeLevelData.bac.visible = true;
+                    setSubtitle("ВЫ УПАЛИ В ЯМУ! Бегите по стрелочкам от Бактерии к лестнице и вентиляции!");
+                }
+                if (activeLevelData.inPit) {
+                    const bx = playerRig.position.x - activeLevelData.bac.position.x;
+                    const bz = playerRig.position.z - activeLevelData.bac.position.z;
+                    const d = Math.hypot(bx, bz);
+                    if (d > 0.4) { activeLevelData.bac.position.x += (bx / d) * 0.04; activeLevelData.bac.position.z += (bz / d) * 0.04; }
+                    if (playerRig.position.x > 11.0) loadLevel1();
+                }
+            } else if (currentState === "LEVEL_4" && !activeLevelData.betaFinished) {
+                const lightOn = Math.sin(Date.now() * 0.002) > -0.2;
+                activeLevelData.ceilingLight.intensity = lightOn ? 1.1 : 0.05;
+                if (!lightOn && activeLevelData.gateUnlocked()) {
+                    const sx = playerRig.position.x - activeLevelData.smiler.position.x;
+                    const sz = playerRig.position.z - activeLevelData.smiler.position.z;
+                    const sd = Math.hypot(sx, sz);
+                    if (sd > 0.5) { activeLevelData.smiler.position.x += (sx / sd) * 0.055; activeLevelData.smiler.position.z += (sz / sd) * 0.055; }
+                }
+                if (Math.hypot(playerRig.position.x - 5, playerRig.position.z + 18.5) < 1.5) {
+                    activeLevelData.betaFinished = true;
+                    document.getElementById('beta-end-screen').classList.add('visible');
+                    setTimeout(returnToMenu, 6500);
+                }
+            }
+
+            if (speedBoost > 0) speedBoost--;
+            if (currentState.startsWith("LEVEL_")) sanity = Math.max(0, sanity - 0.006);
+            const ratio = sanity / 100;
+            rHandVis.userData.sanityBar.scale.x = Math.max(0.05, ratio);
+            rHandVis.userData.sanityMat.color.setHex(ratio > 0.5 ? 0x22c55e : (ratio > 0.25 ? 0xeab308 : 0xef4444));
+            document.getElementById('sanity-vignette').style.boxShadow = `inset 0 0 ${Math.floor((1 - ratio) * 130)}px rgba(0,0,0,0.95)`;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateWorld();
+            const w = window.innerWidth, h = window.innerHeight;
+            if (isStereo) {
+                const hw = w / 2;
+                camera.aspect = hw / h; camera.updateProjectionMatrix();
+                renderer.setViewport(0, 0, hw, h); renderer.setScissor(0, 0, hw, h);
+                camera.translateX(-0.032); renderer.render(scene, camera); camera.translateX(0.032);
+                renderer.setViewport(hw, 0, hw, h); renderer.setScissor(hw, 0, hw, h);
+                camera.translateX(0.032); renderer.render(scene, camera); camera.translateX(-0.032);
+            } else {
+                camera.aspect = w / h; camera.updateProjectionMatrix();
+                renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h);
+                renderer.render(scene, camera);
+            }
+        }
+        animate();
+    </script>
+</body>
+</html>
