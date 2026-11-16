@@ -33,13 +33,13 @@
 
         #top-controls { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; z-index: 30; }
         .hud-btn {
-            background: rgba(15, 13, 8, 0.82); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.4);
+            background: rgba(15, 13, 8, 0.85); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.4);
             padding: 7px 12px; border-radius: 10px; font-size: 11.5px; font-weight: bold; cursor: pointer;
         }
 
         #coop-bar {
             display: none; position: fixed; top: 48px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 13, 8, 0.9); border: 1px solid #facc15; border-radius: 12px;
+            background: rgba(15, 13, 8, 0.92); border: 1px solid #facc15; border-radius: 12px;
             padding: 8px 14px; pointer-events: auto; z-index: 35; color: white; font-size: 12px; align-items: center; gap: 8px;
         }
         #coop-bar input {
@@ -49,8 +49,8 @@
 
         #subtitle-box {
             position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-            background: rgba(12, 10, 5, 0.82); color: #fef08a; padding: 9px 18px; border-radius: 12px;
-            font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid rgba(250, 204, 21, 0.25); z-index: 30; max-width: 90vw;
+            background: rgba(12, 10, 5, 0.85); color: #fef08a; padding: 9px 18px; border-radius: 12px;
+            font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid rgba(250, 204, 21, 0.3); z-index: 30; max-width: 90vw;
         }
 
         #beta-end-screen {
@@ -70,7 +70,7 @@
 
     <div id="boot-overlay">
         <h1>VR Escape The Backrooms</h1>
-        <p>Разрешите доступ к камере и датчикам движения для отслеживания двух рук и поворотов головы в VR</p>
+        <p>Нажмите кнопку ниже, чтобы войти в жёлтый лабиринт, включить гироскоп и камеру рук</p>
         <div class="btn-group">
             <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
             <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
@@ -101,8 +101,8 @@
 
     <video id="cam-video" playsinline autoplay muted></video>
 
-    <script src="https://unpkg.com" onerror="this.onerror=null;this.src='https://jsdelivr.net'"></script>
-    <script src="https://unpkg.com" crossorigin="anonymous"></script>
+    <script src="./three.min.js"></script>
+    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
 
     <script>
         const DB_URL = "https://" + "vrgamep-79dc0-default-rtdb" + ".firebaseio.com";
@@ -335,7 +335,7 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
                 video.srcObject = stream;
-                const hands = new Hands({ locateFile: (f) => `https://unpkg.com{f}` });
+                const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
                 hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
                 hands.onResults((res) => {
