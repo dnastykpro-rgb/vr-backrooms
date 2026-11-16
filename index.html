@@ -70,7 +70,7 @@
 
     <div id="boot-overlay">
         <h1>VR Escape The Backrooms</h1>
-        <p>Автономный VR-движок: запускается мгновенно без внешних библиотек</p>
+        <p>Поставьте телефон горизонтально для VR-очков и нажмите кнопку запуска</p>
         <div class="btn-group">
             <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
             <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
@@ -91,7 +91,7 @@
             <input type="text" id="join-code-input" placeholder="Код друга" maxlength="4">
             <button class="hud-btn" onclick="joinFriendRoom()">Войти</button>
         </div>
-        <div id="subtitle-box">Нажмите или коснитесь рукой кнопки «ИГРАТЬ» перед вами</div>
+        <div id="subtitle-box">Протяните руку к маленькой кнопке «ИГРАТЬ» перед вами</div>
     </div>
 
     <div id="beta-end-screen">
@@ -194,7 +194,7 @@
             } else if (type === 'sign') {
                 g.fillStyle = bg; g.fillRect(0, 0, 256, 256);
                 g.strokeStyle = fg; g.lineWidth = 12; g.strokeRect(10, 10, 236, 236);
-                g.fillStyle = fg; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+                g.fillStyle = fg; g.font = 'bold 42px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
                 g.fillText(label, 128, 128);
             } else {
                 g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
@@ -219,8 +219,8 @@
             gl.drawArrays(gl.TRIANGLES, 0, 36);
         }
 
-        function setCamView(eyeX, eyeY, eyeZ, yaw, pitch, roll, aspect) {
-            const f = 1.0 / Math.tan(0.65), near = 0.1, far = 120;
+        function setCamView(eyeX, eyeY, eyeZ, yaw, pitch, aspect) {
+            const f = 1.0 / Math.tan(0.65), near = 0.05, far = 120;
             gl.uniformMatrix4fv(uProj, false, new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)/(near-far),-1, 0,0,(2*far*near)/(near-far),0]));
 
             const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -239,27 +239,30 @@
 
         function drawHandsAndBelt(px, py, pz, yaw, pitch, sanityVal, hasWater, hasItem, cursorOn) {
             const c = Math.cos(yaw), s = Math.sin(yaw);
+            const cp = Math.cos(pitch), sp = Math.sin(pitch);
             const putLocal = (lx, ly, lz, sx, sy, sz, r, g, b) => {
-                const wx = px + lx * c + lz * s;
-                const wy = py + ly + Math.sin(pitch) * (-lz);
-                const wz = pz - lx * s + lz * c;
+                const fwd = -lz * cp - ly * sp;
+                const up = ly * cp - lz * sp;
+                const wx = px + lx * c - fwd * s;
+                const wy = py + up;
+                const wz = pz - lx * s - fwd * c;
                 drawBox(wx, wy, wz, sx, sy, sz, yaw, texSolid, r, g, b);
             };
 
-            putLocal(leftHand.x, leftHand.y, leftHand.z + 0.16, 0.08, 0.08, 0.28, 0.85, 0.78, 0.22);
-            putLocal(leftHand.x, leftHand.y, leftHand.z, 0.09, 0.04, 0.11, 0.1, 0.1, 0.12);
+            putLocal(leftHand.x, leftHand.y, leftHand.z + 0.16, 0.075, 0.075, 0.28, 0.85, 0.78, 0.22);
+            putLocal(leftHand.x, leftHand.y, leftHand.z, 0.085, 0.038, 0.10, 0.1, 0.1, 0.12);
 
-            putLocal(rightHand.x, rightHand.y, rightHand.z + 0.16, 0.08, 0.08, 0.28, 0.85, 0.78, 0.22);
-            putLocal(rightHand.x, rightHand.y, rightHand.z, 0.09, 0.04, 0.11, 0.1, 0.1, 0.12);
+            putLocal(rightHand.x, rightHand.y, rightHand.z + 0.16, 0.075, 0.075, 0.28, 0.85, 0.78, 0.22);
+            putLocal(rightHand.x, rightHand.y, rightHand.z, 0.085, 0.038, 0.10, 0.1, 0.1, 0.12);
 
             const sRatio = Math.max(0.05, sanityVal / 100);
             const sr = sRatio > 0.5 ? 0.15 : 0.95;
             const sg = sRatio > 0.25 ? 0.85 : 0.15;
-            putLocal(rightHand.x, rightHand.y + 0.045, rightHand.z + 0.10, 0.07 * sRatio, 0.018, 0.03, sr, sg, 0.15);
+            putLocal(rightHand.x, rightHand.y + 0.042, rightHand.z + 0.10, 0.065 * sRatio, 0.016, 0.028, sr, sg, 0.15);
 
-            if (cursorOn) putLocal(rightHand.x, rightHand.y, rightHand.z - 1.5, 0.01, 0.01, 2.8, 0.95, 0.15, 0.15);
-            if (hasWater) putLocal(-0.26, -0.72, -0.05, 0.07, 0.16, 0.07, 0.22, 0.74, 0.97);
-            if (hasItem) putLocal(0.26, -0.72, -0.05, 0.08, 0.26, 0.08, 0.98, 0.80, 0.08);
+            if (cursorOn) putLocal(rightHand.x, rightHand.y, rightHand.z - 1.5, 0.008, 0.008, 2.8, 0.95, 0.15, 0.15);
+            if (hasWater) putLocal(-0.24, -0.68, -0.05, 0.07, 0.16, 0.07, 0.22, 0.74, 0.97);
+            if (hasItem) putLocal(0.24, -0.68, -0.05, 0.08, 0.26, 0.08, 0.98, 0.80, 0.08);
         }
 
         function drawFriendHazmat(fx, fy, fz, fyaw, walk) {
@@ -276,12 +279,12 @@
         let maxUnlockedLevel = parseInt(localStorage.getItem('backrooms_vr_save') || "0");
 
         const player = { x: 0, y: 1.65, z: 2.5 };
-        const leftHand = { x: -0.25, y: -0.22, z: -0.45 };
-        const rightHand = { x: 0.25, y: -0.22, z: -0.45 };
+        const leftHand = { x: -0.22, y: -0.12, z: -0.42 };
+        const rightHand = { x: 0.22, y: -0.12, z: -0.42 };
         const friend = { visible: false, x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, yaw: 0, tyaw: 0, walking: false, walk: 0 };
 
         let leftGesture = "NONE", rightGesture = "NONE", cursorMode = false, lastThumbTime = 0, handNearMouth = false;
-        let gyroYaw = 0, gyroPitch = 0, gyroRoll = 0, yawOffset = 0;
+        let gyroYaw = 0, gyroPitch = 0, yawOffset = 0;
 
         function setSubtitle(t) { document.getElementById('subtitle-box').innerText = t; }
 
@@ -315,9 +318,10 @@
         }, 120);
 
         function classifyHand(lm) {
-            const thumbUp = lm.at(4).y < lm.at(3).y && lm.at(8).y > lm.at(6).y && lm.at(12).y > lm.at(10).y;
+            const thumbUp = lm.at(4).y < lm.at(3).y && lm.at(8).y > lm.at(6).y && lm.at(12).y > lm.at(10).y && lm.at(20).y > lm.at(18).y;
             const iOpen = lm.at(8).y < lm.at(6).y, mOpen = lm.at(12).y < lm.at(10).y;
             const rOpen = lm.at(16).y < lm.at(14).y, pOpen = lm.at(20).y < lm.at(18).y;
+            if (pOpen && !iOpen && !mOpen && !rOpen) return "PINKY";
             if (thumbUp && !iOpen && !mOpen) return "THUMB";
             if (!iOpen && !mOpen && !rOpen && !pOpen) return "FIST";
             if (iOpen && !mOpen && !rOpen && !pOpen) return "POINT";
@@ -328,15 +332,14 @@
 
         async function startHandTracking() {
             const s = document.createElement('script');
-            s.src = "https://jsdelivr.net";
-            s.crossOrigin = "anonymous";
+            s.src = "./hands.js";
             s.onload = async () => {
                 if (typeof Hands !== 'function') return;
                 const video = document.getElementById('cam-video');
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
                     video.srcObject = stream;
-                    const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
+                    const hands = new Hands({ locateFile: (f) => `https://unpkg.com{f}` });
                     hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
                     hands.onResults((res) => {
                         leftGesture = "NONE"; rightGesture = "NONE"; handNearMouth = false;
@@ -345,13 +348,13 @@
                                 const lm = res.multiHandLandmarks[i];
                                 const side = res.multiHandedness[i].label;
                                 const gest = classifyHand(lm);
-                                const hx = (0.5 - lm.at(9).x) * 0.9, hy = (0.5 - lm.at(9).y) * 0.7 - 0.15;
+                                const hx = (0.5 - lm.at(9).x) * 0.85, hy = (0.5 - lm.at(9).y) * 0.65 - 0.10;
                                 const size = Math.hypot(lm.at(0).x - lm.at(9).x, lm.at(0).y - lm.at(9).y);
                                 if (side === "Left") {
                                     leftGesture = gest; leftHand.x = hx; leftHand.y = hy;
                                 } else {
                                     rightGesture = gest; rightHand.x = hx; rightHand.y = hy;
-                                    rightHand.z = size > 0.34 ? -0.18 : -0.45;
+                                    rightHand.z = size > 0.34 ? -0.18 : -0.42;
                                     if (size > 0.34) handNearMouth = true;
                                     if (gest === "THUMB" && Date.now() - lastThumbTime > 1000) {
                                         lastThumbTime = Date.now(); cursorMode = !cursorMode;
@@ -391,7 +394,7 @@
 
         function addBtn(x, y, z, w, h, label, bgHex, fgHex, onClick) {
             const tex = makeTex('sign', label, bgHex, fgHex);
-            const box = addBox(x, y, z, w, h, 0.12, tex, 1, 1, 1);
+            const box = addBox(x, y, z, w, h, 0.06, tex, 1, 1, 1);
             buttons.push({ box, onClick, cooldown: 0 });
         }
 
@@ -417,10 +420,11 @@
             addBox(-5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
             addBox(5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
 
-            addBtn(0, 1.55, 0.8, 1.35, 0.55, "ИГРАТЬ", "#eab308", "#090804", () => {
+            // Маленькая кнопка размером с голову (0.28 x 0.22 м) прямо перед игроком на расстоянии вытянутой руки!
+            addBtn(0, 1.56, 2.02, 0.28, 0.22, "ИГРАТЬ", "#eab308", "#090804", () => {
                 loadLobbyScene();
             });
-            setSubtitle("Коснитесь рукой или нажмите на 3D-кнопку «ИГРАТЬ» перед вами");
+            setSubtitle("Протяните руку к маленькой кнопке «ИГРАТЬ» прямо перед лицом");
         }
 
         function loadLobbyScene() {
@@ -434,13 +438,14 @@
             addBox(-6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
             addBox(6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
 
-            addBtn(-1.5, 2.1, -1.5, 1.8, 0.55, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
+            // Компактные кнопки выбора режима и сохранений в зоне досягаемости рук около игрока
+            addBtn(-0.32, 1.68, 2.55, 0.34, 0.16, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
                 isCoop = false;
                 document.getElementById('coop-bar').style.display = 'none';
-                setSubtitle("Выбран одиночный режим. Нажмите на сохранение уровня ниже!");
+                setSubtitle("Выбран одиночный режим. Коснитесь сохранения уровня ниже!");
             });
 
-            addBtn(1.5, 2.1, -1.5, 1.8, 0.55, "С ДРУГОМ (CO-OP)", "#38bdf8", "#090804", () => {
+            addBtn(0.32, 1.68, 2.55, 0.34, 0.16, "С ДРУГОМ", "#38bdf8", "#090804", () => {
                 isCoop = true;
                 if (!roomCode) roomCode = String(Math.floor(1000 + Math.random() * 9000));
                 document.getElementById('my-room-code').innerText = roomCode;
@@ -450,21 +455,21 @@
             });
 
             const levels = [
-                { name: "УР.0: ЛОББИ", fn: loadLevel0 },
-                { name: "УР.1: МАШИНЫ", fn: loadLevel1 },
-                { name: "УР.2: КОЖЕКРАД", fn: loadLevel2 },
-                { name: "УР.3: ТЕМНОТА", fn: loadLevel3 },
-                { name: "УР.4: УЛЫБАШКИ", fn: loadLevel4 }
+                { name: "УР.0", fn: loadLevel0 },
+                { name: "УР.1", fn: loadLevel1 },
+                { name: "УР.2", fn: loadLevel2 },
+                { name: "УР.3", fn: loadLevel3 },
+                { name: "УР.4", fn: loadLevel4 }
             ];
 
             levels.forEach((lvl, idx) => {
                 const unlocked = idx <= maxUnlockedLevel;
-                addBtn(-3.2 + idx * 1.6, 1.15, -1.5, 1.4, 0.5, unlocked ? lvl.name : "ЗАКРЫТО", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
+                addBtn(-0.44 + idx * 0.22, 1.44, 2.55, 0.19, 0.15, unlocked ? lvl.name : "ЗАКР", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
                     if (unlocked) lvl.fn();
                     else setSubtitle("Сначала пройдите предыдущий уровень!");
                 });
             });
-            setSubtitle("Лобби: выберите режим (Один / С другом) и нажмите на уровень");
+            setSubtitle("Лобби: коснитесь рукой режима (Одиночная / С другом) и сохранения уровня");
         }
 
         function joinFriendRoom() {
@@ -553,7 +558,7 @@
                 { name: "ЖЁЛТЫЙ", hex: "#eab308", rgb: [0.91, 0.70, 0.03] }
             ].sort(() => Math.random() - 0.5);
 
-            const positions = [[-7, 4], [7, 4], [-7, -4], [7, -4], [-7, -12], [7, -12]];
+            const positions = [[-7, 4],, [-7, -4], [7, -4], [-7, -12], [7, -12]];
             let carIdx = 0;
             positions.forEach(([bx, bz], i) => {
                 addBox(bx, 1.6, bz - 2.5, 6, 3.2, 0.3, texConcrete, 1, 1, 1, 2, 1);
@@ -562,7 +567,7 @@
                     addBox(bx, 0.7, bz, 3.6, 1.2, 1.9, texSolid, 0.45, 0.48, 0.52);
                 } else if (carIdx < 4) {
                     const col = colors[carIdx];
-                    addBox(bx, 0.65, bz, 3.6, 1.1, 1.8, texSolid, col.rgb[0], col.rgb[1], col.rgb[2]);
+                    addBox(bx, 0.65, bz, 3.6, 1.1, 1.8, texSolid, col.rgb, col.rgb, col.rgb);
                     const signTex = makeTex('sign', `№${carIdx + 1}`, "#0f172a", col.hex);
                     addBox(bx > 0 ? bx - 2.8 : bx + 2.8, 1.8, bz, 0.1, 1.0, 1.0, signTex, 1, 1, 1);
                     carIdx++;
@@ -686,9 +691,16 @@
 
         window.addEventListener('deviceorientation', (e) => {
             if (e.alpha === null) return;
+            const isLandscape = window.innerWidth > window.innerHeight;
             gyroYaw = e.alpha * Math.PI / 180;
-            gyroPitch = (e.beta - 90) * Math.PI / 180;
-            gyroRoll = e.gamma * Math.PI / 180;
+
+            if (isLandscape) {
+                const g = e.gamma || 0;
+                const tilt = g < 0 ? (90 + g) : (g - 90);
+                gyroPitch = Math.max(-1.25, Math.min(1.25, tilt * Math.PI / 180));
+            } else {
+                gyroPitch = Math.max(-1.25, Math.min(1.25, ((e.beta || 90) - 90) * Math.PI / 180));
+            }
         });
 
         let drag = false, px = 0, py = 0;
@@ -745,14 +757,23 @@
             }
 
             const c = Math.cos(totalYaw), s = Math.sin(totalYaw);
-            const rHandX = player.x + rightHand.x * c + rightHand.z * s;
-            const rHandY = player.y + rightHand.y + Math.sin(gyroPitch) * (-rightHand.z);
-            const rHandZ = player.z - rightHand.x * s + rightHand.z * c;
+            const cp = Math.cos(gyroPitch), sp = Math.sin(gyroPitch);
+
+            const getHandWorld = (h) => {
+                const fwd = -h.z * cp - h.y * sp;
+                const up = h.y * cp - h.z * sp;
+                return { x: player.x + h.x * c - fwd * s, y: player.y + up, z: player.z - h.x * s - fwd * c };
+            };
+
+            const rW = getHandWorld(rightHand);
+            const lW = getHandWorld(leftHand);
 
             for (let btn of buttons) {
                 if (btn.cooldown > 0) { btn.cooldown--; continue; }
-                const dist = Math.hypot(rHandX - btn.box.x, rHandY - btn.box.y, rHandZ - btn.box.z);
-                if (dist < 0.9 || (cursorMode && dist < 3.2 && rightGesture === "POINT")) {
+                const dR = Math.hypot(rW.x - btn.box.x, rW.y - btn.box.y, rW.z - btn.box.z);
+                const dL = Math.hypot(lW.x - btn.box.x, lW.y - btn.box.y, lW.z - btn.box.z);
+                const dist = Math.min(dR, dL);
+                if (dist < 0.35 || (cursorMode && dR < 3.2 && rightGesture === "POINT")) {
                     btn.cooldown = 45;
                     btn.onClick();
                 }
@@ -827,21 +848,21 @@
             document.getElementById('sanity-vignette').style.boxShadow = `inset 0 0 ${Math.floor((1 - sanity / 100) * 130)}px rgba(0,0,0,0.95)`;
         }
 
+        let currentCrouch = 0;
         function renderScene(eyeOffset, aspect, totalYaw, pitch) {
-            const leanSide = Math.sin(gyroRoll) * 0.42;
-            const leanFwd = Math.max(-0.2, Math.sin(-pitch) * 0.35);
-            const crouch = pitch < -0.65 ? -0.65 : 0;
+            const targetCrouch = (leftGesture === "PINKY") ? -0.65 : 0;
+            currentCrouch += (targetCrouch - currentCrouch) * 0.15;
 
-            const camX = player.x + Math.cos(totalYaw) * (leanSide + eyeOffset) - Math.sin(totalYaw) * leanFwd;
-            const camY = player.y + crouch - Math.abs(leanSide) * 0.15;
-            const camZ = player.z - Math.sin(totalYaw) * (leanSide + eyeOffset) - Math.cos(totalYaw) * leanFwd;
+            const camX = player.x + Math.cos(totalYaw) * eyeOffset;
+            const camY = player.y + currentCrouch;
+            const camZ = player.z - Math.sin(totalYaw) * eyeOffset;
 
             gl.uniform3f(uFogCol, fogColor[0], fogColor[1], fogColor[2]);
             gl.uniform1f(uFogDen, fogDensity);
             gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-            setCamView(camX, camY, camZ, totalYaw, pitch, gyroRoll, aspect);
+            setCamView(camX, camY, camZ, totalYaw, pitch, aspect);
 
             for (let b of boxes) {
                 if (b.visible) drawBox(b.x, b.y, b.z, b.sx, b.sy, b.sz, b.rotY, b.tex, b.r, b.g, b.b, b.u, b.v);
