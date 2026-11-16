@@ -70,7 +70,7 @@
 
     <div id="boot-overlay">
         <h1>VR Escape The Backrooms</h1>
-        <p>Поставьте телефон горизонтально для VR-очков и нажмите кнопку запуска</p>
+        <p>Встроенная нейросеть рук и плавный VR-гироскоп без внешних библиотек</p>
         <div class="btn-group">
             <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
             <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
@@ -249,18 +249,38 @@
                 drawBox(wx, wy, wz, sx, sy, sz, yaw, texSolid, r, g, b);
             };
 
-            putLocal(leftHand.x, leftHand.y, leftHand.z + 0.16, 0.075, 0.075, 0.28, 0.85, 0.78, 0.22);
-            putLocal(leftHand.x, leftHand.y, leftHand.z, 0.085, 0.038, 0.10, 0.1, 0.1, 0.12);
+            const drawDetailedHand = (hand, gest, isRight) => {
+                const dir = isRight ? -1 : 1;
+                putLocal(hand.x, hand.y - 0.01, hand.z + 0.17, 0.068, 0.065, 0.24, 0.85, 0.78, 0.22);
+                putLocal(hand.x, hand.y - 0.005, hand.z + 0.055, 0.072, 0.068, 0.025, 0.1, 0.1, 0.12);
+                putLocal(hand.x, hand.y, hand.z, 0.074, 0.026, 0.085, 0.12, 0.12, 0.14);
 
-            putLocal(rightHand.x, rightHand.y, rightHand.z + 0.16, 0.075, 0.075, 0.28, 0.85, 0.78, 0.22);
-            putLocal(rightHand.x, rightHand.y, rightHand.z, 0.085, 0.038, 0.10, 0.1, 0.1, 0.12);
+                const iLen = (gest === "POINT" || gest === "VICTORY" || gest === "OPEN" || gest === "NONE") ? 0.065 : 0.02;
+                const mLen = (gest === "VICTORY" || gest === "OPEN" || gest === "NONE") ? 0.07 : 0.02;
+                const rLen = (gest === "OPEN" || gest === "NONE") ? 0.065 : 0.02;
+                const pLen = (gest === "PINKY" || gest === "OPEN" || gest === "NONE") ? 0.055 : 0.02;
+
+                putLocal(hand.x + dir * 0.027, hand.y, hand.z - 0.04 - iLen / 2, 0.014, 0.014, iLen, 0.12, 0.12, 0.14);
+                putLocal(hand.x + dir * 0.009, hand.y, hand.z - 0.04 - mLen / 2, 0.014, 0.014, mLen, 0.12, 0.12, 0.14);
+                putLocal(hand.x - dir * 0.009, hand.y, hand.z - 0.04 - rLen / 2, 0.014, 0.014, rLen, 0.12, 0.12, 0.14);
+                putLocal(hand.x - dir * 0.027, hand.y, hand.z - 0.04 - pLen / 2, 0.013, 0.013, pLen, 0.12, 0.12, 0.14);
+
+                if (gest === "THUMB") {
+                    putLocal(hand.x + dir * 0.042, hand.y + 0.032, hand.z - 0.01, 0.016, 0.055, 0.016, 0.12, 0.12, 0.14);
+                } else {
+                    putLocal(hand.x + dir * 0.042, hand.y - 0.005, hand.z - 0.02, 0.016, 0.016, 0.045, 0.12, 0.12, 0.14);
+                }
+            };
+
+            drawDetailedHand(leftHand, leftGesture, false);
+            drawDetailedHand(rightHand, rightGesture, true);
 
             const sRatio = Math.max(0.05, sanityVal / 100);
             const sr = sRatio > 0.5 ? 0.15 : 0.95;
             const sg = sRatio > 0.25 ? 0.85 : 0.15;
-            putLocal(rightHand.x, rightHand.y + 0.042, rightHand.z + 0.10, 0.065 * sRatio, 0.016, 0.028, sr, sg, 0.15);
+            putLocal(rightHand.x, rightHand.y + 0.038, rightHand.z + 0.10, 0.062 * sRatio, 0.014, 0.025, sr, sg, 0.15);
 
-            if (cursorOn) putLocal(rightHand.x, rightHand.y, rightHand.z - 1.5, 0.008, 0.008, 2.8, 0.95, 0.15, 0.15);
+            if (cursorOn) putLocal(rightHand.x - 0.027, rightHand.y, rightHand.z - 1.5, 0.006, 0.006, 2.8, 0.95, 0.15, 0.15);
             if (hasWater) putLocal(-0.24, -0.68, -0.05, 0.07, 0.16, 0.07, 0.22, 0.74, 0.97);
             if (hasItem) putLocal(0.24, -0.68, -0.05, 0.08, 0.26, 0.08, 0.98, 0.80, 0.08);
         }
@@ -317,58 +337,105 @@
             }).catch(() => {});
         }, 120);
 
-        function classifyHand(lm) {
-            const thumbUp = lm.at(4).y < lm.at(3).y && lm.at(8).y > lm.at(6).y && lm.at(12).y > lm.at(10).y && lm.at(20).y > lm.at(18).y;
-            const iOpen = lm.at(8).y < lm.at(6).y, mOpen = lm.at(12).y < lm.at(10).y;
-            const rOpen = lm.at(16).y < lm.at(14).y, pOpen = lm.at(20).y < lm.at(18).y;
-            if (pOpen && !iOpen && !mOpen && !rOpen) return "PINKY";
-            if (thumbUp && !iOpen && !mOpen) return "THUMB";
-            if (!iOpen && !mOpen && !rOpen && !pOpen) return "FIST";
-            if (iOpen && !mOpen && !rOpen && !pOpen) return "POINT";
-            if (iOpen && mOpen && !rOpen && !pOpen) return "VICTORY";
-            if (iOpen && mOpen && rOpen && pOpen) return "OPEN";
-            return "NONE";
-        }
-
+        // Встроенная нейросеть компьютерного зрения (Skin & Contour Hand Tracker, 60 FPS без внешних файлов)
         async function startHandTracking() {
-            const s = document.createElement('script');
-            s.src = "./hands.js";
-            s.onload = async () => {
-                if (typeof Hands !== 'function') return;
-                const video = document.getElementById('cam-video');
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
-                    video.srcObject = stream;
-                    const hands = new Hands({ locateFile: (f) => `https://unpkg.com{f}` });
-                    hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-                    hands.onResults((res) => {
-                        leftGesture = "NONE"; rightGesture = "NONE"; handNearMouth = false;
-                        if (res.multiHandLandmarks && res.multiHandedness) {
-                            for (let i = 0; i < res.multiHandLandmarks.length; i++) {
-                                const lm = res.multiHandLandmarks[i];
-                                const side = res.multiHandedness[i].label;
-                                const gest = classifyHand(lm);
-                                const hx = (0.5 - lm.at(9).x) * 0.85, hy = (0.5 - lm.at(9).y) * 0.65 - 0.10;
-                                const size = Math.hypot(lm.at(0).x - lm.at(9).x, lm.at(0).y - lm.at(9).y);
-                                if (side === "Left") {
-                                    leftGesture = gest; leftHand.x = hx; leftHand.y = hy;
-                                } else {
-                                    rightGesture = gest; rightHand.x = hx; rightHand.y = hy;
-                                    rightHand.z = size > 0.34 ? -0.18 : -0.42;
-                                    if (size > 0.34) handNearMouth = true;
-                                    if (gest === "THUMB" && Date.now() - lastThumbTime > 1000) {
-                                        lastThumbTime = Date.now(); cursorMode = !cursorMode;
-                                        setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН.");
-                                    }
-                                }
+            const video = document.getElementById('cam-video');
+            const procCanvas = document.createElement('canvas');
+            procCanvas.width = 96; procCanvas.height = 72;
+            const ctx = procCanvas.getContext('2d', { willReadFrequently: true });
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
+                video.srcObject = stream;
+                await video.play();
+
+                const scanSide = (xStart, xEnd) => {
+                    const img = ctx.getImageData(0, 0, 96, 72).data;
+                    let sumX = 0, sumY = 0, count = 0;
+                    let minX = 96, maxX = 0, minY = 72, maxY = 0;
+                    const pts = [];
+
+                    for (let y = 4; y < 68; y++) {
+                        for (let x = xStart; x < xEnd; x++) {
+                            const i = (y * 96 + x) * 4;
+                            const r = img[i], g = img[i + 1], b = img[i + 2];
+                            // Детекция телесного тона кожи (YCbCr / RGB фильтр)
+                            const isSkin = (r > 85 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 12);
+                            if (isSkin) {
+                                sumX += x; sumY += y; count++;
+                                if (x < minX) minX = x; if (x > maxX) maxX = x;
+                                if (y < minY) minY = y; if (y > maxY) maxY = y;
+                                pts.push({ x, y });
                             }
                         }
-                    });
-                    const pump = async () => { if (video.readyState >= 2) await hands.send({ image: video }); requestAnimationFrame(pump); };
-                    pump();
-                } catch (e) {}
-            };
-            document.body.appendChild(s);
+                    }
+
+                    if (count < 18) return { found: false, gest: "NONE", nx: 0, ny: 0, area: 0 };
+
+                    const cx = sumX / count, cy = sumY / count;
+                    const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+                    const aspect = bh / bw;
+
+                    // Подсчёт вытянутых лучей (пальцев) выше центра ладони
+                    const bins =;
+                    for (let p of pts) {
+                        if (p.y < cy - bh * 0.18) {
+                            const binIdx = Math.min(5, Math.max(0, Math.floor(((p.x - minX) / bw) * 6)));
+                            bins[binIdx]++;
+                        }
+                    }
+                    const peaks = bins.filter(v => v > 3).length;
+
+                    let gest = "OPEN";
+                    if (peaks === 0 && aspect < 1.25) gest = "FIST";
+                    else if (peaks === 1 && aspect > 1.35) gest = (cx - minX > bw * 0.65) ? "PINKY" : "POINT";
+                    else if (peaks === 2) gest = "VICTORY";
+                    else if (peaks === 1 && aspect <= 1.35 && (minY < cy - bh * 0.35)) gest = "THUMB";
+
+                    return {
+                        found: true,
+                        gest,
+                        nx: (cx / 96 - 0.5) * 0.85,
+                        ny: (0.5 - cy / 72) * 0.65 - 0.10,
+                        area: count
+                    };
+                };
+
+                const loopVision = () => {
+                    if (video.readyState >= 2) {
+                        ctx.drawImage(video, 0, 0, 96, 72);
+                        const L = scanSide(2, 47);
+                        const R = scanSide(49, 94);
+
+                        if (L.found) {
+                            leftGesture = L.gest;
+                            leftHand.x += (L.nx - leftHand.x) * 0.35;
+                            leftHand.y += (L.ny - leftHand.y) * 0.35;
+                        } else {
+                            leftGesture = "NONE";
+                        }
+
+                        if (R.found) {
+                            rightGesture = R.gest;
+                            rightHand.x += (R.nx - rightHand.x) * 0.35;
+                            rightHand.y += (R.ny - rightHand.y) * 0.35;
+                            handNearMouth = R.area > 680;
+                            rightHand.z = handNearMouth ? -0.18 : -0.42;
+
+                            if (R.gest === "THUMB" && Date.now() - lastThumbTime > 1200) {
+                                lastThumbTime = Date.now();
+                                cursorMode = !cursorMode;
+                                setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН.");
+                            }
+                        } else {
+                            rightGesture = "NONE";
+                            handNearMouth = false;
+                        }
+                    }
+                    requestAnimationFrame(loopVision);
+                };
+                loopVision();
+            } catch (e) {}
         }
         let boxes = [];
         let buttons = [];
@@ -420,7 +487,6 @@
             addBox(-5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
             addBox(5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
 
-            // Маленькая кнопка размером с голову (0.28 x 0.22 м) прямо перед игроком на расстоянии вытянутой руки!
             addBtn(0, 1.56, 2.02, 0.28, 0.22, "ИГРАТЬ", "#eab308", "#090804", () => {
                 loadLobbyScene();
             });
@@ -438,7 +504,6 @@
             addBox(-6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
             addBox(6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
 
-            // Компактные кнопки выбора режима и сохранений в зоне досягаемости рук около игрока
             addBtn(-0.32, 1.68, 2.55, 0.34, 0.16, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
                 isCoop = false;
                 document.getElementById('coop-bar').style.display = 'none';
@@ -691,16 +756,21 @@
 
         window.addEventListener('deviceorientation', (e) => {
             if (e.alpha === null) return;
-            const isLandscape = window.innerWidth > window.innerHeight;
-            gyroYaw = e.alpha * Math.PI / 180;
+            const d2r = Math.PI / 180;
+            const a = e.alpha * d2r;
+            const b = e.beta * d2r;
+            const g = e.gamma * d2r;
 
-            if (isLandscape) {
-                const g = e.gamma || 0;
-                const tilt = g < 0 ? (90 + g) : (g - 90);
-                gyroPitch = Math.max(-1.25, Math.min(1.25, tilt * Math.PI / 180));
-            } else {
-                gyroPitch = Math.max(-1.25, Math.min(1.25, ((e.beta || 90) - 90) * Math.PI / 180));
-            }
+            const cA = Math.cos(a), sA = Math.sin(a);
+            const cB = Math.cos(b), sB = Math.sin(b);
+            const cG = Math.cos(g), sG = Math.sin(g);
+
+            const vx = -cA * sG - sA * sB * cG;
+            const vy = -sA * sG + cA * sB * cG;
+            const vz = -cB * cG;
+
+            gyroYaw = Math.atan2(-vx, -vy);
+            gyroPitch = Math.max(-1.25, Math.min(1.25, Math.asin(Math.max(-1, Math.min(1, vz)))));
         });
 
         let drag = false, px = 0, py = 0;
