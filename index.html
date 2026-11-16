@@ -1,1120 +1,893 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VR Escape The Backrooms — Beta</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
-        body { overflow: hidden; background: #090804; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Mobile The Backrooms</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif;user-select:none;touch-action:none}
+body{overflow:hidden;background:#0a0905}canvas{display:block;width:100vw;height:100vh}
+#term-menu{position:fixed;inset:0;z-index:100;background:radial-gradient(circle at 25% 50%,rgba(24,20,8,.84),rgba(8,7,4,.94));display:flex;flex-direction:column;justify-content:space-between;padding:22px 28px}
+#term-menu.off{display:none}
+.t-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(245,158,11,.35);padding-bottom:10px}
+.t-brand{color:#f59e0b;font-size:23px;font-weight:900;letter-spacing:1.8px;text-transform:uppercase}
+.t-brand span{display:block;font-size:10.5px;color:#a8a29e;letter-spacing:1px}
+.t-nick{background:rgba(28,25,23,.88);border:1px solid #f59e0b;color:#fef08a;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;width:155px;outline:none;touch-action:auto}
+.t-grid{display:flex;gap:16px;align-items:center;flex:1;padding:12px 0}
+.t-nav{width:220px;display:flex;flex-direction:column;gap:9px}
+.t-btn{background:rgba(28,25,23,.88);color:#f5f5f4;border:1px solid rgba(245,158,11,.45);border-left:5px solid #f59e0b;padding:11px 13px;border-radius:8px;text-align:left;font-size:12px;font-weight:800;letter-spacing:.5px;cursor:pointer}
+.t-btn:active{background:#f59e0b;color:#0a0905}
+.t-box{display:none;flex:1;max-width:340px;background:rgba(18,16,12,.92);border:1px solid rgba(245,158,11,.4);border-radius:12px;padding:14px;color:#e7e5e4;font-size:12px;flex-direction:column;gap:9px}
+.t-box.on{display:flex}
+.t-box input{background:#1c1917;border:1px solid #f59e0b;color:#f59e0b;padding:8px;border-radius:6px;font-weight:bold;text-align:center;font-size:14px;outline:none;touch-action:auto}
+.t-foot{display:flex;justify-content:space-between;color:#78716c;font-size:11px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#chat-box{position:fixed;top:12px;left:12px;width:225px;background:rgba(12,11,8,.42);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:6px;z-index:35;pointer-events:auto;transition:opacity .7s ease}
+#chat-box.fade{opacity:.18}#chat-box:focus-within{opacity:1!important}
+#chat-log{height:48px;overflow-y:auto;font-size:10.5px;color:#f5f5f4;display:flex;flex-direction:column;gap:2px;margin-bottom:4px;text-shadow:0 1px 2px #000}
+#chat-row{display:flex;gap:4px}
+#chat-in{flex:1;min-width:0;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:11px;padding:4px 6px;border-radius:6px;outline:none;touch-action:auto}
+#chat-ent{background:#d97706;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:bold;cursor:pointer}
+#item-prompt{display:none;position:fixed;z-index:25;pointer-events:none;transform:translate(-50%,-100%);flex-direction:column;align-items:center;gap:4px}
+#item-prompt.show{display:flex}
+.ip-card{background:rgba(255,255,255,.94);color:#111;padding:5px 12px;border-radius:10px;font-size:12px;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.5);white-space:nowrap}
+.ip-sub{background:rgba(15,15,15,.82);color:#fef08a;padding:2px 9px;border-radius:6px;font-size:10.5px;font-weight:800;border:1px solid rgba(255,255,255,.25)}
 
-        #boot-overlay {
-            position: fixed; inset: 0; z-index: 100;
-            background: radial-gradient(circle at center, #29220a 0%, #090804 100%);
-            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
-            transition: opacity 0.4s ease;
-        }
-        #boot-overlay.hidden { opacity: 0; pointer-events: none; }
-        #boot-overlay h1 { color: #facc15; font-size: 26px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
-        #boot-overlay p { color: #d6d3d1; font-size: 13px; margin-bottom: 22px; text-align: center; max-width: 380px; }
+#room-tag{display:none;position:fixed;top:12px;left:50%;transform:translateX(-50%);background:rgba(18,16,12,.88);border:1px solid #f59e0b;border-radius:8px;padding:5px 12px;color:#f59e0b;font-size:11px;font-weight:800;z-index:35}
+#btn-menu{position:fixed;top:12px;right:12px;background:rgba(28,25,23,.82);color:#f59e0b;border:1px solid rgba(245,158,11,.45);padding:7px 14px;border-radius:10px;font-size:11.5px;font-weight:800;pointer-events:auto;z-index:35;cursor:pointer}
+#cross{position:fixed;top:50%;left:50%;width:6px;height:6px;background:rgba(255,255,255,.85);border-radius:50%;transform:translate(-50%,-50%);z-index:20;box-shadow:0 0 4px #000}
+#joy-zone{position:fixed;left:24px;bottom:24px;width:114px;height:114px;border-radius:50%;background:rgba(120,120,120,.35);border:2px solid rgba(60,60,60,.65);pointer-events:auto;z-index:30}
+#joy-stick{position:absolute;left:34px;top:34px;width:42px;height:42px;border-radius:50%;background:rgba(45,45,45,.88)}
+#mini-hud{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;pointer-events:auto;z-index:30}
+.m-hand{width:52px;height:52px;background:rgba(18,16,12,.82);border:1.5px solid #f59e0b;border-radius:10px;display:flex;justify-content:center;align-items:center;color:#fef08a;font-size:10px;font-weight:bold;text-align:center}
+#btn-bag{height:52px;padding:0 14px;background:rgba(28,25,23,.88);color:#f59e0b;border:1.5px solid rgba(245,158,11,.45);border-radius:10px;font-size:11px;font-weight:800;cursor:pointer}
+#btn-f{display:none;position:fixed;right:24px;bottom:172px;width:54px;height:54px;border-radius:14px;background:rgba(28,28,28,.9);color:#f5f5f4;border:1.5px solid rgba(255,255,255,.28);font-size:20px;font-weight:900;justify-content:center;align-items:center;pointer-events:auto;z-index:30;cursor:pointer}
+#btn-f.show{display:flex}
+#btn-drink{display:none;position:fixed;right:90px;bottom:150px;width:48px;height:48px;border-radius:50%;background:rgba(14,165,233,.9);color:#fff;border:none;font-size:18px;justify-content:center;align-items:center;pointer-events:auto;z-index:30;cursor:pointer}
+#btn-drink.show{display:flex}
+#btn-crouch{position:fixed;right:104px;bottom:26px;width:52px;height:52px;border-radius:14px;background:rgba(24,24,24,.88);border:1.5px solid rgba(255,255,255,.2);display:flex;justify-content:center;align-items:center;pointer-events:auto;z-index:30;cursor:pointer}
+#btn-sprint{position:fixed;right:22px;bottom:78px;width:68px;height:68px;border-radius:16px;background:rgba(24,24,24,.88);border:2px solid #f59e0b;display:flex;justify-content:center;align-items:center;pointer-events:auto;z-index:30;cursor:pointer}
+#btn-crouch.on,#btn-sprint:active,#btn-f:active{background:#f59e0b;color:#0a0905}
 
-        .btn-group { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-        .vr-start-btn {
-            background: linear-gradient(135deg, #eab308, #ca8a04); color: #090804; border: none;
-            padding: 15px 28px; border-radius: 14px; font-size: 15px; font-weight: 900; cursor: pointer;
-            box-shadow: 0 8px 25px rgba(234, 179, 8, 0.4); transition: transform 0.2s;
-        }
-        .vr-start-btn:active { transform: scale(0.95); }
-        .vr-start-btn.alt { background: #1c1917; color: #facc15; border: 1px solid #facc15; box-shadow: none; }
-
-        #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
-        #vr-divider { display: none; position: fixed; top: 0; bottom: 0; left: 50%; width: 3px; background: #000; transform: translateX(-50%); z-index: 20; }
-
-        #top-controls { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: auto; z-index: 30; }
-        .hud-btn {
-            background: rgba(15, 13, 8, 0.85); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.4);
-            padding: 7px 12px; border-radius: 10px; font-size: 11.5px; font-weight: bold; cursor: pointer;
-        }
-
-        #coop-bar {
-            display: none; position: fixed; top: 48px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 13, 8, 0.92); border: 1px solid #facc15; border-radius: 12px;
-            padding: 8px 14px; pointer-events: auto; z-index: 35; color: white; font-size: 12px; align-items: center; gap: 8px;
-        }
-        #coop-bar input {
-            width: 75px; background: #292524; border: 1px solid #facc15; color: #facc15;
-            padding: 5px 8px; border-radius: 6px; font-weight: bold; text-align: center; outline: none; touch-action: auto;
-        }
-
-        #subtitle-box {
-            position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-            background: rgba(12, 10, 5, 0.85); color: #fef08a; padding: 9px 18px; border-radius: 12px;
-            font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid rgba(250, 204, 21, 0.3); z-index: 30; max-width: 90vw;
-        }
-
-        #beta-end-screen {
-            position: fixed; inset: 0; z-index: 150; background: rgba(5, 5, 3, 0.96);
-            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px;
-            opacity: 0; pointer-events: none; transition: opacity 1.2s ease; text-align: center;
-        }
-        #beta-end-screen.visible { opacity: 1; pointer-events: auto; }
-        #beta-end-screen h2 { color: #facc15; font-size: 22px; line-height: 1.5; max-width: 540px; text-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
-        #beta-end-screen p { color: #a8a29e; font-size: 13px; margin-top: 16px; }
-
-        #sanity-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 15; transition: box-shadow 0.3s ease; }
-        #cam-video { display: none; }
-    </style>
+#pad-screen{display:none;position:fixed;inset:0;z-index:90;background:rgba(10,9,6,.82);backdrop-filter:blur(5px);flex-direction:column;justify-content:space-between;padding:18px 26px;pointer-events:auto}
+#pad-screen.on{display:flex}
+.pad-head{display:flex;justify-content:flex-end}
+.pad-title{background:linear-gradient(270deg,rgba(245,158,11,.92),rgba(245,158,11,.15));color:#0a0905;padding:6px 26px 6px 46px;border-radius:8px;font-size:16px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase}
+.pad-body{display:flex;justify-content:center;align-items:center;gap:22px;flex:1}
+.pad-col{background:rgba(24,21,16,.75);border:1px solid rgba(245,158,11,.35);border-radius:12px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:7px}
+.pad-lbl{background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.5);color:#fef08a;font-size:9.5px;font-weight:900;padding:3px 10px;border-radius:6px;width:106px;text-align:center;letter-spacing:.6px}
+.p-cell{width:54px;height:54px;background:#14120e;border:1.5px solid rgba(255,255,255,.16);border-radius:9px;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#f5f5f4;font-size:10px;font-weight:bold;text-align:center;cursor:pointer}
+.p-cell.act{border-color:#f59e0b;background:rgba(245,158,11,.16);box-shadow:0 0 12px rgba(245,158,11,.28)}
+.bp-grid{display:grid;grid-template-columns:repeat(3,54px);gap:6px;background:rgba(24,21,16,.75);padding:10px;border:1px solid rgba(245,158,11,.35);border-radius:12px}
+.san-box{width:110px;height:212px;background:rgba(24,21,16,.85);border:1.5px solid rgba(245,158,11,.4);border-radius:12px;padding:10px;display:flex;flex-direction:column;justify-content:space-between;align-items:center}
+.san-tube{width:34px;height:130px;background:#0c0a08;border:1.5px solid rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:flex-end;overflow:hidden;padding:2px}
+#san-fill{width:100%;height:100%;background:#22c55e;border-radius:7px;transition:height .25s,background .25s}
+.pad-foot{display:flex;justify-content:space-between;align-items:center;color:#a8a29e;font-size:11px;font-weight:700}
+#end{position:fixed;inset:0;z-index:150;background:rgba(8,7,4,.96);display:none;flex-direction:column;justify-content:center;align-items:center;padding:24px;text-align:center}
+#end.on{display:flex}#end h2{color:#f59e0b;font-size:20px;line-height:1.5;max-width:500px}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:15}
+</style>
 </head>
 <body>
+<div id="term-menu">
+<div class="t-head">
+<div class="t-brand">Mobile The Backrooms<span>A.E.G. FIELD TERMINAL</span></div>
+<input id="inp-nick" class="t-nick" value="Agent_01" maxlength="16" placeholder="Позывной">
+</div>
+<div class="t-grid">
+<div class="t-nav">
+<button class="t-btn" onclick="openTab('solo')">ОДИНОЧНЫЙ ВЫХОД</button>
+<button class="t-btn" onclick="openTab('coop')">КООПЕРАТИВ (CO-OP)</button>
+<button class="t-btn" onclick="openTab('suit')">УНИФОРМА АГЕНТА</button>
+</div>
+<div id="tab-solo" class="t-box on">
+<b>ВЫБОР СЕКТОРА (СОХРАНЕНИЯ)</b>
+<div id="lvl-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+</div>
+<div id="tab-coop" class="t-box">
+<b>СОВМЕСТНАЯ ЭКСПЕДИЦИЯ</b>
+<button class="t-btn" onclick="hostRoom()">СОЗДАТЬ ЛОББИ (ХОСТ)</button>
+<div style="text-align:center;color:#78716c">— ИЛИ КОД ГЛАВНОГО В ЛОББИ —</div>
+<input id="join-code" placeholder="4 ЦИФРЫ" maxlength="4">
+<button class="t-btn" onclick="joinRoom()">ВОЙТИ В ЛОББИ</button>
+</div>
+<div id="tab-suit" class="t-box">
+<b>ЦВЕТ ЗАЩИТНОГО КОСТЮМА</b>
+<button class="t-btn" onclick="pickSuit(0xd9c836)">ЯНТАРНЫЙ СТАНДАРТ</button>
+<button class="t-btn" onclick="pickSuit(0x38bdf8)">ЛАЗУРНЫЙ РАЗВЕДЧИК</button>
+<button class="t-btn" onclick="pickSuit(0xef4444)">АЛЫЙ ШТУРМОВОЙ</button>
+</div>
+</div>
+<div class="t-foot"><span>СЮЖЕТНЫЙ РЕЖИМ</span><span>ВЕРСИЯ 1.0</span></div>
+</div>
 
-    <div id="boot-overlay">
-        <h1>VR Escape The Backrooms</h1>
-        <p>Графика с мягкими тенями, влажными отражениями, агентом M.E.G. и встроенным трекингом рук</p>
-        <div class="btn-group">
-            <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
-            <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
-        </div>
-    </div>
+<div id="vig"></div><div id="cross"></div>
+<div id="item-prompt"><div class="ip-card" id="ip-name">Предмет</div><div class="ip-sub">Нажмите F</div></div>
 
-    <div id="sanity-vignette"></div>
-    <div id="vr-divider"></div>
+<div id="hud">
+<div id="chat-box" class="fade">
+<div id="chat-log"></div>
+<div id="chat-row"><input id="chat-in" placeholder="Сообщение..." maxlength="60"><button id="chat-ent" onclick="sendChat()">Enter</button></div>
+</div>
+<div id="room-tag">ЛОББИ: <span id="rc">----</span></div>
+<button id="btn-menu" onclick="toTermMenu()">В Меню</button>
+<div id="joy-zone"><div id="joy-stick"></div></div>
+<div id="mini-hud">
+<div class="m-hand" id="hud-hand" onclick="togglePad()">ПУСТО</div>
+<button id="btn-bag" onclick="togglePad()">РЮКЗАК</button>
+</div>
+<button id="btn-drink" onclick="drinkWater()" title="Выпить">💧</button>
+<button id="btn-f" onclick="doInteract()">F</button>
+<button id="btn-crouch" onclick="toggleCrouch()"><svg width="22" height="22" viewBox="0 0 24 24" fill="#e7e5e4"><circle cx="12" cy="6" r="2.5"/><path d="M9 11h6l1 4h-3v4h-2v-4H8z"/></svg></button>
+<button id="btn-sprint" ontouchstart="sprint=true" ontouchend="sprint=false" onmousedown="sprint=true" onmouseup="sprint=false"><svg width="28" height="28" viewBox="0 0 24 24" fill="#f59e0b"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></button>
+</div>
 
-    <div id="hud">
-        <div id="top-controls">
-            <button class="hud-btn" onclick="toggleStereo()">VR / 1 Экран</button>
-            <button class="hud-btn" onclick="recenterHead()">Центр головы</button>
-            <button class="hud-btn" onclick="returnToMenu()">В Меню</button>
-        </div>
-        <div id="coop-bar">
-            <span>Код комнаты: <b id="my-room-code">----</b></span>
-            <input type="text" id="join-code-input" placeholder="Код друга" maxlength="4">
-            <button class="hud-btn" onclick="joinFriendRoom()">Войти</button>
-        </div>
-        <div id="subtitle-box">Протяните руку к маленькой кнопке «ИГРАТЬ» перед вами</div>
-    </div>
+<div id="pad-screen">
+<div class="pad-head"><div class="pad-title">Снаряжение</div></div>
+<div class="pad-body">
+<div class="pad-col">
+<div class="pad-lbl">БЫСТРЫЙ ДОСТУП</div>
+<div style="font-size:9px;color:#a8a29e;font-weight:800">В РУКЕ</div>
+<div class="p-cell act" id="inv-main" onclick="unequipMain()"></div>
+<div style="font-size:9px;color:#a8a29e;font-weight:800;margin-top:3px">КАРМАНЫ</div>
+<div class="p-cell" id="inv-p0" onclick="equipFrom('p0')"></div>
+<div class="p-cell" id="inv-p1" onclick="equipFrom('p1')"></div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+<div class="pad-lbl" style="width:160px">РЮКЗАК (3×3)</div>
+<div class="bp-grid" id="bp-grid"></div>
+</div>
+<div class="san-box">
+<div style="font-size:9.5px;color:#f59e0b;font-weight:900;text-align:center">РАССУДОК</div>
+<div class="san-tube"><div id="san-fill"></div></div>
+<div id="san-pct" style="color:#22c55e;font-size:13px;font-weight:900">100%</div>
+</div>
+</div>
+<div class="pad-foot">
+<button class="t-btn" style="width:130px;text-align:center" onclick="togglePad()">ЗАКРЫТЬ</button>
+<span>НАЖМИТЕ НА ПРЕДМЕТ, ЧТОБЫ ВЗЯТЬ В РУКУ</span>
+</div>
+</div>
 
-    <div id="beta-end-screen">
-        <h2>Спасибо за прохождение Бета-Теста игры VR Escape The Backrooms! В скором времени появится еще больше новых уровней! Еще раз спасибо, Удачи! Пока!</h2>
-        <p>Возврат в главное меню...</p>
-    </div>
+<div id="end"><h2>Спасибо за прохождение Бета-Теста Mobile The Backrooms! В скором времени появятся новые уровни. Удачи!</h2></div>
+<script src="./three.min.js"></script><script src="./GLTFLoader.js"></script>
+<script>
+const DB = "https://firebaseio.com";
+const pid = "p_" + Math.floor(1000 + Math.random() * 9000);
+let active = false, st = "MENU", coop = false, isHost = false, code = "";
+let maxLvl = +(localStorage.getItem("mtb_save") || 0), suitCol = 0xd9c836;
 
-    <video id="cam-video" playsinline autoplay muted></video>
-    <script src="./three.min.js"></script>
-    <script src="./GLTFLoader.js"></script>
-
-    <script>
-        const DB_URL = "https://" + "vrgamep-79dc0-default-rtdb" + ".firebaseio.com";
-
-        let isStereo = false, isBooted = false, currentState = "MENU";
-        let isCoop = false, roomCode = "", myPlayerId = "p_" + Math.floor(1000 + Math.random() * 9000);
-        let maxUnlockedLevel = parseInt(localStorage.getItem('backrooms_vr_save') || "0");
-
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x141106);
-        scene.fog = new THREE.FogExp2(0x181408, 0.042);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 120);
-        const playerRig = new THREE.Group();
-        playerRig.position.set(0, 1.65, 2.5);
-        playerRig.add(camera);
-        scene.add(playerRig);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setScissorTest(true);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.15;
-        document.body.appendChild(renderer.domElement);
-
-        window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight));
-
-        function createReflectionMap() {
-            const c = document.createElement('canvas'); c.width = 256; c.height = 128;
-            const g = c.getContext('2d');
-            const grad = g.createLinearGradient(0, 0, 0, 128);
-            grad.addColorStop(0, '#fef08a'); grad.addColorStop(0.45, '#a18a3a'); grad.addColorStop(1, '#1c180a');
-            g.fillStyle = grad; g.fillRect(0, 0, 256, 128);
-            g.fillStyle = '#ffffff';
-            for (let x = 20; x < 256; x += 64) g.fillRect(x, 12, 24, 8);
-            const tex = new THREE.CanvasTexture(c);
-            tex.mapping = THREE.EquirectangularReflectionMapping;
-            return tex;
+// Гул люминесцентных ламп (60 Гц) без внешних аудиофайлов
+let humCtx = null, humGain = null;
+function setLampHum(enable) {
+    try {
+        if (enable && !humCtx) {
+            humCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = humCtx.createOscillator(), flt = humCtx.createBiquadFilter();
+            humGain = humCtx.createGain();
+            osc.type = "sawtooth"; osc.frequency.value = 60;
+            flt.type = "lowpass"; flt.frequency.value = 140;
+            humGain.gain.value = 0.035;
+            osc.connect(flt); flt.connect(humGain); humGain.connect(humCtx.destination);
+            osc.start();
         }
-        scene.environment = createReflectionMap();
-        function makeTex(type, labelText = "", bgHex = "#eab308", fgHex = "#090804") {
-            const c = document.createElement('canvas');
-            c.width = 256; c.height = 256;
-            const g = c.getContext('2d');
+        if (humGain) humGain.gain.setTargetAtTime(enable ? 0.035 : 0.0001, humCtx.currentTime, 0.2);
+    } catch (e) {}
+}
 
-            if (type === 'wallpaper') {
-                g.fillStyle = '#c8b458'; g.fillRect(0, 0, 256, 256);
-                g.fillStyle = '#b5a044';
-                for (let x = 0; x < 256; x += 32) {
-                    g.fillRect(x, 0, 6, 256);
-                    for (let y = 0; y < 256; y += 32) g.fillRect(x + 12, y + 8, 8, 14);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x141106);
+scene.fog = new THREE.FogExp2(0x181408, 0.038);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 130);
+const rig = new THREE.Group();
+rig.position.set(0, 1.65, 3.2);
+rig.add(camera);
+scene.add(rig);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Чёткое разрешение без пикселей при любом повороте телефона (включая горизонтальный)
+function updateViewportQuality() {
+    const w = document.documentElement.clientWidth || window.innerWidth;
+    const h = document.documentElement.clientHeight || window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
+    renderer.setSize(w, h, false);
+}
+updateViewportQuality();
+window.addEventListener("resize", updateViewportQuality);
+window.addEventListener("orientationchange", () => setTimeout(updateViewportQuality, 120));
+
+const texLoader = new THREE.TextureLoader();
+function loadCustomTex(file, rx, ry, fallbackType) {
+    const fallback = mkTex(fallbackType);
+    fallback.repeat.set(rx, ry);
+    texLoader.load(file, (t) => {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(rx, ry);
+        t.anisotropy = 8;
+        fallback.image = t.image;
+        fallback.needsUpdate = true;
+    }, undefined, () => {});
+    return fallback;
+}
+
+function mkTex(tp, txt = "", bg = "#eab308", fg = "#090804") {
+    const c = document.createElement("canvas"); c.width = c.height = 512;
+    const g = c.getContext("2d");
+    if (tp === "w") {
+        g.fillStyle = "#96963c"; g.fillRect(0, 0, 512, 512);
+        g.fillStyle = "#7a7a2e";
+        for (let x = 0; x < 512; x += 48) {
+            g.fillRect(x, 0, 6, 512);
+            for (let y = 0; y < 512; y += 48) { g.fillRect(x + 18, y + 14, 12, 20); }
+        }
+    } else if (tp === "f") {
+        g.fillStyle = "#8a8538"; g.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 4000; i++) {
+            g.fillStyle = i % 2 ? "rgba(0,0,0,0.12)" : "rgba(255,250,200,0.07)";
+            g.fillRect(Math.random() * 512, Math.random() * 512, 3, 3);
+        }
+    } else if (tp === "ceil") {
+        // Подвесной потолок с металлической сеткой и люминесцентными лампами
+        g.fillStyle = "#b8b28a"; g.fillRect(0, 0, 512, 512);
+        for (let i = 0; i < 2500; i++) { g.fillStyle = "rgba(0,0,0,0.08)"; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+        g.strokeStyle = "#6e6a52"; g.lineWidth = 8;
+        for (let i = 0; i <= 512; i += 128) {
+            g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 512); g.stroke();
+            g.beginPath(); g.moveTo(0, i); g.lineTo(512, i); g.stroke();
+        }
+        // Встроенные светящиеся панели ламп в ячейках сетки
+        g.fillStyle = "#fefce8";
+        g.fillRect(134, 134, 116, 116);
+        g.fillRect(390, 390, 116, 116);
+    } else if (tp === "c") {
+        g.fillStyle = "#475569"; g.fillRect(0, 0, 512, 256); g.fillStyle = "#94a3b8"; g.fillRect(0, 256, 512, 256);
+    } else if (tp === "g") {
+        g.fillStyle = "#e2e8f0"; g.fillRect(0, 0, 512, 512); g.fillStyle = "#0f172a"; g.fillRect(48, 40, 416, 220);
+        g.strokeStyle = "#64748b"; g.lineWidth = 4;
+        for (let x = 48; x <= 464; x += 28) { g.beginPath(); g.moveTo(x, 40); g.lineTo(x, 260); g.stroke(); }
+        for (let y = 40; y <= 260; y += 28) { g.beginPath(); g.moveTo(48, y); g.lineTo(464, y); g.stroke(); }
+    } else if (tp === "a") {
+        g.fillStyle = "#262626"; g.fillRect(0, 0, 512, 512); g.fillStyle = "#000";
+        g.beginPath(); g.moveTo(80, 220); g.lineTo(300, 220); g.lineTo(300, 150); g.lineTo(440, 256); g.lineTo(300, 362); g.lineTo(300, 292); g.lineTo(80, 292); g.fill();
+    } else {
+        g.fillStyle = bg; g.fillRect(0, 0, 512, 512); g.strokeStyle = fg; g.lineWidth = 20; g.strokeRect(18, 18, 476, 476);
+        g.fillStyle = fg; g.font = "bold 72px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, 256, 256);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    return t;
+}
+
+const tW = loadCustomTex("./wall_0.png", 4, 1, "w");
+const tF = loadCustomTex("./carpet_0.png", 10, 10, "f");
+const tCeil = mkTex("ceil"); tCeil.repeat.set(8, 8);
+const tC = mkTex("c"), tG = mkTex("g"), tA = mkTex("a");
+let chatTimer = null;
+function addChatMsg(txt, col = "#fef08a") {
+    const box = document.getElementById("chat-box"), log = document.getElementById("chat-log"), el = document.createElement("div");
+    el.style.color = col; el.innerText = txt; log.appendChild(el); log.scrollTop = log.scrollHeight;
+    box.classList.remove("fade"); clearTimeout(chatTimer);
+    chatTimer = setTimeout(() => box.classList.add("fade"), 6500);
+}
+function sendChat() {
+    const inp = document.getElementById("chat-in"), txt = inp.value.trim();
+    if (!txt) return;
+    inp.value = "";
+    const nick = document.getElementById("inp-nick").value.trim() || "Agent";
+    addChatMsg(`${nick}: ${txt}`, "#ffffff");
+    if (coop && code) fetch(`${DB}/rooms/${code}/chat.json`, { method: "POST", body: JSON.stringify({ u: pid, n: nick, t: txt, ts: Date.now() }) }).catch(() => {});
+}
+document.getElementById("chat-in").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+
+const slvMat = new THREE.MeshStandardMaterial({ color: suitCol, roughness: 0.75 });
+const runArms = new THREE.Group();
+camera.add(runArms);
+function makeSprintArm(side) {
+    const g = new THREE.Group();
+    g.position.set(side * 0.28, -0.58, -0.36);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.054, 0.36, 16), slvMat);
+    arm.rotation.x = Math.PI / 2.4;
+    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.048, 14, 14), new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.45 }));
+    glove.scale.set(0.9, 0.85, 1.35);
+    glove.position.set(0, 0.06, -0.18);
+    g.add(arm, glove);
+    runArms.add(g);
+    return g;
+}
+const sprintArmL = makeSprintArm(-1), sprintArmR = makeSprintArm(1);
+let sprintPhase = 0, sprintBlend = 0, idlePhase = 0;
+
+// Никнейм над головой напарника в кооперативе
+function createNickSprite(name) {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 64;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgba(10, 9, 5, 0.72)"; g.roundRect(16, 10, 224, 44, 14); g.fill();
+    g.strokeStyle = "#f59e0b"; g.lineWidth = 3; g.stroke();
+    g.fillStyle = "#fef08a"; g.font = "bold 24px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(name, 128, 33);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+    sp.scale.set(1.2, 0.3, 1);
+    sp.position.set(0, 2.05, 0);
+    return sp;
+}
+
+function mkAgent(nickName = "Agent") {
+    const r = new THREE.Group(), sM = new THREE.MeshStandardMaterial({ color: suitCol, roughness: 0.65 });
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.19, 0.56, 18), sM); tr.position.y = 1.24; tr.castShadow = true;
+    const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 16), sM); hd.position.y = 1.72;
+    const vs = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 14, -0.9, 1.8, 0.5, 1.1), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.25 })); vs.position.set(0, 1.72, 0.06);
+    const lL = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.075, 0.85, 14), sM); lL.position.set(-0.1, 0.45, 0);
+    const lR = lL.clone(); lR.position.x = 0.1;
+    const nickSp = createNickSprite(nickName);
+    r.add(tr, hd, vs, lL, lR, nickSp);
+    r.userData = { lL, lR, tp: new THREE.Vector3(), ty: 0, wp: 0, nickSp, lastNick: nickName };
+    return r;
+}
+
+const fr = mkAgent("Напарник"); fr.visible = false; scene.add(fr);
+let es = null, chatEs = null;
+
+function connRoom(c) {
+    if (es) es.close();
+    es = new EventSource(`${DB}/rooms/${c}.json`);
+    const syncRoom = (data) => {
+        if (!data) return;
+        // Синхронизация уровня от главного в лобби (хоста)
+        if (!isHost && data.level && data.level !== st) {
+            const mapFn = { L0: lvl0, L1: lvl1, L2: lvl2, L3: lvl3, L4: lvl4 }[data.level];
+            if (mapFn) mapFn();
+        }
+        if (data.players) {
+            for (let [k, v] of Object.entries(data.players)) {
+                if (k !== pid && v && v.x !== undefined) {
+                    fr.visible = true;
+                    fr.userData.tp.set(v.x, v.y, v.z);
+                    fr.userData.ty = v.yaw || 0;
+                    fr.userData.wk = v.wk || false;
+                    if (v.nick && v.nick !== fr.userData.lastNick) {
+                        fr.remove(fr.userData.nickSp);
+                        fr.userData.nickSp = createNickSprite(v.nick);
+                        fr.userData.lastNick = v.nick;
+                        fr.add(fr.userData.nickSp);
+                    }
                 }
-                g.fillStyle = '#423610'; g.fillRect(0, 236, 256, 20);
-            } else if (type === 'carpet') {
-                g.fillStyle = '#8c7a38'; g.fillRect(0, 0, 256, 256);
-                for (let i = 0; i < 1400; i++) {
-                    g.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.14)' : 'rgba(255,245,190,0.10)';
-                    g.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
-                }
-                g.fillStyle = 'rgba(20,16,5,0.22)';
-                g.beginPath(); g.arc(128, 128, 75, 0, Math.PI * 2); g.fill();
-            } else if (type === 'concrete') {
-                g.fillStyle = '#475569'; g.fillRect(0, 0, 256, 128);
-                g.fillStyle = '#94a3b8'; g.fillRect(0, 128, 256, 128);
-                g.fillStyle = '#1e293b'; g.fillRect(0, 124, 256, 8);
-            } else if (type === 'gridDoor') {
-                g.fillStyle = '#e2e8f0'; g.fillRect(0, 0, 256, 256);
-                g.fillStyle = '#0f172a'; g.fillRect(24, 20, 208, 110);
-                g.strokeStyle = '#64748b'; g.lineWidth = 2;
-                for (let x = 24; x <= 232; x += 14) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 130); g.stroke(); }
-                for (let y = 20; y <= 130; y += 14) { g.beginPath(); g.moveTo(24, y); g.lineTo(232, y); g.stroke(); }
-            } else if (type === 'arrow') {
-                g.fillStyle = '#262626'; g.fillRect(0, 0, 256, 256);
-                g.fillStyle = '#09090b';
-                g.beginPath(); g.moveTo(40,110); g.lineTo(150,110); g.lineTo(150,75); g.lineTo(220,128); g.lineTo(150,181); g.lineTo(150,146); g.lineTo(40,146); g.fill();
-            } else if (type === 'megPatch') {
-                g.fillStyle = '#18181b'; g.fillRect(0, 0, 256, 256);
-                g.strokeStyle = '#eab308'; g.lineWidth = 14; g.strokeRect(12, 12, 232, 232);
-                g.fillStyle = '#facc15'; g.font = 'bold 64px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-                g.fillText('M.E.G.', 128, 110);
-                g.font = 'bold 24px sans-serif'; g.fillText('EXPLORER', 128, 175);
-            } else if (type === 'sign') {
-                g.fillStyle = bgHex; g.fillRect(0, 0, 256, 256);
-                g.strokeStyle = fgHex; g.lineWidth = 12; g.strokeRect(10, 10, 236, 236);
-                g.fillStyle = fgHex; g.font = 'bold 42px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-                g.fillText(labelText, 128, 128);
             }
-
-            const t = new THREE.CanvasTexture(c);
-            t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
-            return t;
         }
+    };
+    es.addEventListener("put", (e) => { const m = JSON.parse(e.data); if (m && m.data) syncRoom(m.data); });
+    es.addEventListener("patch", (e) => { const m = JSON.parse(e.data); if (m && m.data) syncRoom(m.data); });
 
-        const texWall = makeTex('wallpaper'), texFloor = makeTex('carpet'), texConcrete = makeTex('concrete');
-        const texGridDoor = makeTex('gridDoor'), texArrow = makeTex('arrow'), texMegPatch = makeTex('megPatch');
-        const leftHandMesh = new THREE.Group();
-        const rightHandMesh = new THREE.Group();
-        camera.add(leftHandMesh, rightHandMesh);
+    if (chatEs) chatEs.close();
+    chatEs = new EventSource(`${DB}/rooms/${c}/chat.json`);
+    chatEs.addEventListener("put", (e) => { const m = JSON.parse(e.data); if (m && m.data) for (let v of Object.values(m.data)) if (v && v.u !== pid && Date.now() - (v.ts || 0) < 15000) addChatMsg(`${v.n || "Друг"}: ${v.t}`, "#38bdf8"); });
+    chatEs.addEventListener("patch", (e) => { const m = JSON.parse(e.data); if (m && m.data) for (let v of Object.values(m.data)) if (v && v.u !== pid) addChatMsg(`${v.n || "Друг"}: ${v.t}`, "#38bdf8"); });
+}
 
-        function buildDetailedHand(isRight) {
-            const grp = new THREE.Group();
-            const sleeveMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.45, metalness: 0.1 });
-            const gloveMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.3, metalness: 0.2 });
+setInterval(() => {
+    if (!coop || !code || !active) return;
+    const nick = document.getElementById("inp-nick").value.trim() || "Agent";
+    fetch(`${DB}/rooms/${code}/players/${pid}.json`, {
+        method: "PUT",
+        body: JSON.stringify({ x: rig.position.x, y: rig.position.y - 1.65, z: rig.position.z, yaw, wk: Math.hypot(joyX, joyY) > 0.1, nick })
+    }).catch(() => {});
+}, 140);
+const wg = new THREE.Group(); scene.add(wg);
+let btns = [], itms = [], ld = {}, san = 100, bst = 0;
 
-            const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.046, 0.28, 18), sleeveMat);
-            forearm.rotation.x = Math.PI / 2; forearm.position.set(0, -0.01, 0.19);
-            forearm.castShadow = true;
+function clr() { while (wg.children.length) wg.remove(wg.children); btns = []; itms = []; ld = {}; }
+function addL(x, y, z, col = 0xfef9c3, int = 1.05, d = 24) {
+    const l = new THREE.PointLight(col, int, d);
+    l.position.set(x, y, z); l.castShadow = true;
+    l.shadow.mapSize.width = 512; l.shadow.mapSize.height = 512; l.shadow.bias = -0.002;
+    wg.add(l); return l;
+}
+function addB(x, y, z, w, h, txt, bg, fg, fn, label = "Панель управления") {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), new THREE.MeshStandardMaterial({ map: mkTex("s", txt, bg, fg), roughness: 0.7 }));
+    m.position.set(x, y, z); wg.add(m); btns.push({ m, fn, label });
+}
+function box(x, y, z, w, h, d, mat, sh = true) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.castShadow = sh; m.receiveShadow = true; wg.add(m); return m;
+}
+function spIt(tp, x, y, z) {
+    const names = { water: "Миндальная вода", key: "Ключ от двери", ladder: "Часть лестницы" };
+    const m = tp === "water" ? new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.24, 14), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35 })) :
+              tp === "key" ? new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 10, 20), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })) :
+              new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.68, 12), new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 }));
+    if (tp === "ladder") m.rotation.z = Math.PI / 2;
+    m.position.set(x, y, z); m.castShadow = true; wg.add(m);
+    itms.push({ tp, m, tk: false, label: names[tp] });
+}
 
-            const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.039, 0.039, 0.025, 18), gloveMat);
-            cuff.rotation.x = Math.PI / 2; cuff.position.set(0, -0.005, 0.055);
+const mW = new THREE.MeshStandardMaterial({ map: tW, roughness: 0.92, metalness: 0.0 });
+const mF = new THREE.MeshStandardMaterial({ map: tF, roughness: 0.96, metalness: 0.0 });
+const mCeil = new THREE.MeshStandardMaterial({ map: tCeil, emissive: 0x3f3c26, emissiveIntensity: 0.35, roughness: 0.85 });
+const mC = new THREE.MeshStandardMaterial({ map: tC, roughness: 0.88, metalness: 0.0 });
+const mG = new THREE.MeshStandardMaterial({ map: tG, roughness: 0.75 }), mA = new THREE.MeshStandardMaterial({ map: tA, roughness: 0.9 });
 
-            const palm = new THREE.Mesh(new THREE.SphereGeometry(0.042, 18, 14), gloveMat);
-            palm.scale.set(0.92, 0.42, 1.15);
-            palm.castShadow = true;
+function buildMenuBackdrop() {
+    clr(); st = "MENU"; setLampHum(false); scene.fog = new THREE.FogExp2(0x1a1608, 0.042);
+    rig.position.set(0, 1.65, 4); yaw = 0.15; pitch = 0;
+    box(0, -0.1, -6, 24, 0.2, 28, mF, false); box(0, 3.3, -6, 24, 0.2, 28, mCeil, false);
+    box(-5, 1.6, -6, 0.4, 3.2, 28, mW); box(4.5, 1.6, -6, 0.4, 3.2, 28, mW); box(0, 1.6, -16, 24, 3.2, 0.4, mW);
+    addL(-0.5, 2.9, 0, 0xfef9c3, 1.0, 18); addL(-0.5, 2.9, -8, 0xfef9c3, 0.95, 18);
+}
+buildMenuBackdrop();
 
-            const fingers = [];
-            const dir = isRight ? -1 : 1;
-            const offsets = [0.026, 0.009, -0.009, -0.026];
-            offsets.forEach((ox) => {
-                const f = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0075, 0.065, 12), gloveMat);
-                f.rotation.x = Math.PI / 2;
-                f.position.set(ox * dir, 0, -0.072);
-                const tip = new THREE.Mesh(new THREE.SphereGeometry(0.0065, 10, 10), gloveMat);
-                tip.position.y = -0.032;
-                f.add(tip);
-                grp.add(f);
-                fingers.push(f);
-            });
+function renderLevelButtons() {
+    const boxEl = document.getElementById("lvl-btns"); boxEl.innerHTML = "";
+    [lvl0, lvl1, lvl2, lvl3, lvl4].forEach((fn, i) => {
+        const b = document.createElement("button"); b.className = "t-btn"; b.style.flex = "1"; b.style.textAlign = "center";
+        b.innerText = i <= maxLvl ? `СЕКТОР ${i}` : "ЗАКР.";
+        b.onclick = () => { if (i <= maxLvl) startGame(fn, "L" + i); };
+        boxEl.appendChild(b);
+    });
+}
+renderLevelButtons();
 
-            const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0085, 0.05, 12), gloveMat);
-            thumb.position.set(0.042 * dir, 0.005, -0.02);
-            thumb.rotation.z = -0.5 * dir;
+function openTab(id) {
+    document.querySelectorAll(".t-box").forEach((b) => b.classList.remove("on"));
+    document.getElementById("tab-" + id).classList.add("on");
+    if (id === "solo") renderLevelButtons();
+}
+function pickSuit(col) { suitCol = col; slvMat.color.setHex(col); }
+function hostRoom() {
+    coop = true; isHost = true; code = "" + Math.floor(1000 + Math.random() * 9000);
+    fetch(`${DB}/rooms/${code}.json`, { method: "PUT", body: JSON.stringify({ level: "L0" }) }).catch(() => {});
+    connRoom(code); startGame(lvl0, "L0");
+}
+function joinRoom() {
+    const c = document.getElementById("join-code").value.trim();
+    if (c.length === 4) { coop = true; isHost = false; code = c; connRoom(c); startGame(lvl0, "L0"); }
+}
+function startGame(lvlFn, lvlCode) {
+    document.getElementById("term-menu").classList.add("off");
+    document.getElementById("hud").style.display = "block";
+    const rt = document.getElementById("room-tag");
+    if (coop) { rt.style.display = "block"; document.getElementById("rc").innerText = code + (isHost ? " (ХОСТ)" : ""); }
+    else rt.style.display = "none";
+    active = true; invState = { main: null, p0: null, p1: null, bp: new Array(9).fill(null) }; renderInv();
+    if (coop && isHost) fetch(`${DB}/rooms/${code}/level.json`, { method: "PUT", body: JSON.stringify(lvlCode) }).catch(() => {});
+    lvlFn();
+}
+function toTermMenu() {
+    active = false; padOpen = false; setLampHum(false);
+    document.getElementById("pad-screen").classList.remove("on");
+    document.getElementById("hud").style.display = "none";
+    document.getElementById("item-prompt").classList.remove("show");
+    document.getElementById("end").classList.remove("on");
+    document.getElementById("term-menu").classList.remove("off");
+    renderLevelButtons(); buildMenuBackdrop();
+}
+const unlk = (n) => {
+    if (n > maxLvl) { maxLvl = n; localStorage.setItem("mtb_save", n); }
+    if (coop && isHost && code) fetch(`${DB}/rooms/${code}/level.json`, { method: "PUT", body: JSON.stringify("L" + n) }).catch(() => {});
+};
 
-            if (isRight) {
-                const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 3.0, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-                laser.rotation.x = Math.PI / 2; laser.position.set(-0.026, 0, -1.55);
-                laser.visible = false;
-                grp.add(laser);
-                grp.userData.laser = laser;
+let padOpen = false, invState = { main: null, p0: null, p1: null, bp: new Array(9).fill(null) };
+const itemLabels = { water: "💧\nВода", ladder: "🪜\nЛестн.", key: "🔑\nКлюч" };
 
-                const band = new THREE.Mesh(new THREE.CylinderGeometry(0.041, 0.041, 0.035, 18), gloveMat);
-                band.rotation.x = Math.PI / 2; band.position.set(0, -0.008, 0.10);
-                const barMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
-                const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.055, 12), barMat);
-                bar.rotation.z = Math.PI / 2;
-                bar.position.set(0, 0.032, 0.10);
-                grp.add(band, bar);
-                grp.userData.sanityBar = bar;
-                grp.userData.sanityMat = barMat;
-            }
+function togglePad() { padOpen = !padOpen; document.getElementById("pad-screen").classList.toggle("on", padOpen); if (padOpen) renderInv(); }
+function renderInv() {
+    document.getElementById("inv-main").innerText = invState.main ? itemLabels[invState.main] : "";
+    document.getElementById("inv-p0").innerText = invState.p0 ? itemLabels[invState.p0] : "";
+    document.getElementById("inv-p1").innerText = invState.p1 ? itemLabels[invState.p1] : "";
+    const grid = document.getElementById("bp-grid"); grid.innerHTML = "";
+    for (let i = 0; i < 9; i++) {
+        const cell = document.createElement("div"); cell.className = "p-cell";
+        cell.innerText = invState.bp[i] ? itemLabels[invState.bp[i]] : "";
+        cell.onclick = () => equipFromBp(i); grid.appendChild(cell);
+    }
+    const cur = invState.main;
+    document.getElementById("hud-hand").innerText = cur ? itemLabels[cur].replace("\n", " ") : "ПУСТО";
+    document.getElementById("btn-drink").classList.toggle("show", cur === "water");
+}
+function unequipMain() {
+    if (!invState.main) return;
+    if (!invState.p0) { invState.p0 = invState.main; invState.main = null; }
+    else if (!invState.p1) { invState.p1 = invState.main; invState.main = null; }
+    else { const idx = invState.bp.indexOf(null); if (idx !== -1) { invState.bp[idx] = invState.main; invState.main = null; } }
+    renderInv();
+}
+function equipFrom(slot) { if (!invState[slot]) return; const tmp = invState.main; invState.main = invState[slot]; invState[slot] = tmp; renderInv(); }
+function equipFromBp(i) { if (!invState.bp[i]) return; const tmp = invState.main; invState.main = invState.bp[i]; invState.bp[i] = tmp; renderInv(); }
+function storeItem(tp) {
+    if (!invState.main) { invState.main = tp; renderInv(); return true; }
+    if (!invState.p0) { invState.p0 = tp; renderInv(); return true; }
+    if (!invState.p1) { invState.p1 = tp; renderInv(); return true; }
+    const idx = invState.bp.indexOf(null); if (idx !== -1) { invState.bp[idx] = tp; renderInv(); return true; }
+    addChatMsg("Рюкзак переполнен!", "#ef4444"); return false;
+}
+function drinkWater() {
+    if (invState.main !== "water") return;
+    invState.main = null; renderInv(); san = Math.min(100, san + 45); bst = 500;
+    addChatMsg("Выпили миндальную воду! Рассудок восстановлен", "#38bdf8");
+}
+function lvl0() {
+    clr(); st = "L0"; setLampHum(true); rig.position.set(0, 1.65, 0); yaw = pitch = 0;
+    box(0, -0.1, -5, 26, 0.2, 18, mF, false); box(-6, -0.1, -18, 10, 0.2, 8, mF, false); box(6, -0.1, -18, 10, 0.2, 8, mF, false);
+    box(0, -0.1, -15, 2, 0.2, 2, mF, false); box(0, -0.1, -21, 2, 0.2, 2, mF, false); box(0, 3.3, -10, 32, 0.2, 32, mCeil, false);
+    box(0, 1.6, 3.5, 22, 3.2, 0.4, mW); box(-11, 1.6, -9, 0.4, 3.2, 26, mW); box(11, 1.6, -9, 0.4, 3.2, 26, mW);
+    box(-4, 1.6, -4, 0.4, 3.2, 8, mW); box(4, 1.6, -5, 0.4, 3.2, 7, mW);
+    box(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, mW); box(-3.2, 1, -13.5, 2, 2, 0.5, mW); box(-3.2, 2.9, -13.5, 2, 0.6, 0.5, mW);
+    box(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x09090b })); box(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, mW);
 
-            grp.add(forearm, cuff, palm, thumb);
-            grp.userData.fingers = fingers;
-            grp.userData.thumb = thumb;
-            return grp;
+    const d0 = box(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.85 }));
+    const sps = [];
+    for (let i = 0; i < 3; i++) {
+        const s = box(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 }));
+        s.visible = false; sps.push(s);
+    }
+
+    box(0, -4.2, -18, 28, 0.3, 24, mF, false); box(0, -2.6, -14, 26, 3.2, 0.4, mW); box(0, -2.6, -22, 26, 3.2, 0.4, mW);
+    box(-3, -2.4, -14.25, 1.2, 0.8, 0.05, mA); box(4, -2.4, -14.25, 1.2, 0.8, 0.05, mA);
+    box(11.5, -3.2, -18, 2.5, 1.8, 2.5, new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.85 }));
+
+    const bac = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.3, 10), new THREE.MeshStandardMaterial({ color: 0x09090b }));
+    bac.position.set(-10, -3, -18); bac.visible = false; wg.add(bac);
+
+    addL(0, 3, -3); addL(0, 3, -16);
+    spIt("ladder", -7.5, 0.2, -1.5); spIt("ladder", 7.5, 0.2, -8.5); spIt("ladder", 1.2, 0.2, -2);
+    spIt("key", -3.2, 2.25, -13.4); spIt("water", -7, 0.2, -9);
+
+    ld = { sps, pl: 0, d0, op: false, pit: false, bac };
+    addChatMsg("Уровень 0: Соберите 3 части лестницы под нишу с ключом");
+}
+
+function lvl1() {
+    unlk(1); clr(); st = "L1"; setLampHum(false); rig.position.set(0, 1.65, 8); yaw = pitch = 0;
+    const fl = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.9, metalness: 0.0 });
+    box(0, -0.1, -6, 24, 0.2, 34, fl, false); box(0, 3.4, -6, 24, 0.2, 34, mC, false);
+    box(0, 1.6, 10, 24, 3.2, 0.4, mC); box(0, 1.6, -22, 24, 3.2, 0.4, mC);
+    addL(0, 3.2, 2, 0xe2e8f0); addL(0, 3.2, -12, 0xe2e8f0);
+
+    const cols = [{ n: "КРАСНЫЙ", h: "#ef4444", c: 0xef4444 }, { n: "СИНИЙ", h: "#3b82f6", c: 0x3b82f6 }, { n: "ЗЕЛЁНЫЙ", h: "#22c55e", c: 0x22c55e }, { n: "ЖЁЛТЫЙ", h: "#eab308", c: 0xeab308 }].sort(() => Math.random() - 0.5);
+    const pos = [{ x: -7, z: 4 }, { x: 7, z: 4 }, { x: -7, z: -4 }, { x: 7, z: -4 }, { x: -7, z: -12 }, { x: 7, z: -12 }];
+    let ci = 0;
+    pos.forEach((p, i) => {
+        box(p.x, 1.6, p.z - 2.5, 6, 3.2, 0.3, mC); box(p.x, 1.6, p.z + 2.5, 6, 3.2, 0.3, mC);
+        if (i === 1 || i === 4) box(p.x, 0.6, p.z, 3.5, 1.1, 1.8, new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 }));
+        else if (ci < 4) {
+            const cl = cols[ci];
+            box(p.x, 0.6, p.z, 3.5, 1, 1.7, new THREE.MeshStandardMaterial({ color: cl.c, roughness: 0.5 }));
+            const sg = new THREE.Mesh(new THREE.CircleGeometry(0.5, 20), new THREE.MeshStandardMaterial({ map: mkTex("s", "№" + (ci + 1), "#0f172a", cl.h) }));
+            sg.position.set(p.x > 0 ? p.x - 2.8 : p.x + 2.8, 1.8, p.z);
+            sg.rotation.y = p.x > 0 ? -Math.PI / 2 : Math.PI / 2;
+            wg.add(sg); ci++;
         }
+    });
 
-        const lHandVis = buildDetailedHand(false), rHandVis = buildDetailedHand(true);
-        leftHandMesh.add(lHandVis); rightHandMesh.add(rHandVis);
-        leftHandMesh.position.set(-0.22, -0.14, -0.42);
-        rightHandMesh.position.set(0.22, -0.14, -0.42);
-
-        const beltGroup = new THREE.Group();
-        beltGroup.position.set(0, -0.72, 0);
-        playerRig.add(beltGroup);
-        const beltRing = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.022, 12, 28), new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 }));
-        beltRing.rotation.x = Math.PI / 2;
-        const beltWater = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.16, 14), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.15, metalness: 0.2 }));
-        beltWater.position.set(-0.25, -0.05, -0.08); beltWater.visible = false;
-        const beltItem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 14), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 }));
-        beltItem.position.set(0.25, -0.06, -0.08); beltItem.visible = false;
-        beltGroup.add(beltRing, beltWater, beltItem);
-        function createMegAgentModel() {
-            const root = new THREE.Group();
-            const suitMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.45, metalness: 0.08 });
-            const gearMat = new THREE.MeshStandardMaterial({ color: 0x141417, roughness: 0.35, metalness: 0.25 });
-            const visorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.92, roughness: 0.06, envMapIntensity: 1.6 });
-            const tankMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.65, roughness: 0.25 });
-
-            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.19, 0.56, 20), suitMat);
-            torso.position.y = 1.24; torso.castShadow = true;
-
-            const chestCap = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2), suitMat);
-            chestCap.position.y = 1.52; chestCap.scale.set(1.0, 0.45, 0.85);
-
-            const belt = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.028, 12, 24), gearMat);
-            belt.rotation.x = Math.PI / 2; belt.position.y = 0.96;
-
-            const strapL = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.58, 10), gearMat);
-            strapL.position.set(-0.11, 1.25, 0.17); strapL.rotation.z = -0.12;
-            const strapR = strapL.clone(); strapR.position.x = 0.11; strapR.rotation.z = 0.12;
-
-            const pouchL = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.13, 14), gearMat);
-            pouchL.position.set(-0.21, 0.93, 0.04);
-            const pouchR = pouchL.clone(); pouchR.position.x = 0.21;
-
-            const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.44, 16), tankMat);
-            tank.position.set(0, 1.28, -0.23); tank.castShadow = true;
-            const tankCap = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), tankMat);
-            tankCap.position.set(0, 1.50, -0.23);
-
-            const hood = new THREE.Mesh(new THREE.SphereGeometry(0.155, 22, 20), suitMat);
-            hood.position.set(0, 1.72, -0.01); hood.castShadow = true;
-
-            const maskBase = new THREE.Mesh(new THREE.SphereGeometry(0.135, 20, 18), gearMat);
-            maskBase.position.set(0, 1.70, 0.035);
-
-            const visor = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 16, -0.9, 1.8, 0.5, 1.1), visorMat);
-            visor.position.set(0, 1.72, 0.065);
-
-            const filterL = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.038, 0.055, 16), gearMat);
-            filterL.rotation.x = Math.PI / 2.2; filterL.rotation.z = 0.25;
-            filterL.position.set(-0.065, 1.64, 0.155);
-            const filterR = filterL.clone(); filterR.position.x = 0.065; filterR.rotation.z = -0.25;
-
-            const makeArm = (side) => {
-                const armGrp = new THREE.Group();
-                armGrp.position.set(side * 0.25, 1.48, 0);
-                const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 14), suitMat);
-                const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.048, 0.48, 14), suitMat);
-                limb.position.y = -0.24; limb.castShadow = true;
-                const glove = new THREE.Mesh(new THREE.SphereGeometry(0.052, 14, 14), gearMat);
-                glove.scale.set(0.9, 1.3, 0.9); glove.position.y = -0.50;
-                armGrp.add(shoulder, limb, glove);
-
-                if (side === -1) {
-                    const patch = new THREE.Mesh(new THREE.CylinderGeometry(0.061, 0.061, 0.09, 14, 1, true, -1.2, 1.6), new THREE.MeshStandardMaterial({ map: texMegPatch }));
-                    patch.position.y = -0.14;
-                    armGrp.add(patch);
-                }
-                return armGrp;
-            };
-            const armL = makeArm(-1), armR = makeArm(1);
-
-            const makeLeg = (side) => {
-                const legGrp = new THREE.Group();
-                legGrp.position.set(side * 0.105, 0.92, 0);
-                const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.075, 0.78, 16), suitMat);
-                limb.position.y = -0.39; limb.castShadow = true;
-                const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.085, 0.18, 16), gearMat);
-                boot.position.set(0, -0.82, 0.02);
-                const toe = new THREE.Mesh(new THREE.SphereGeometry(0.082, 14, 12), gearMat);
-                toe.scale.set(0.95, 0.75, 1.4); toe.position.set(0, -0.85, 0.07);
-                legGrp.add(limb, boot, toe);
-                return legGrp;
-            };
-            const legL = makeLeg(-1), legR = makeLeg(1);
-
-            root.add(torso, chestCap, belt, strapL, strapR, pouchL, pouchR, tank, tankCap, hood, maskBase, visor, filterL, filterR, armL, armR, legL, legR);
-            root.userData = { legL, legR, armL, armR, targetPos: new THREE.Vector3(), targetYaw: 0, walkPhase: 0 };
-            return root;
+    const ent = [];
+    cols.forEach((c, i) => addB(-1.5 + i, 1.5, -21.6, 0.8, 0.45, c.n, c.h, "#fff", () => {
+        ent.push(c.n); addChatMsg(c.n + " (" + ent.length + "/4)");
+        if (ent.length === 4) {
+            if (ent.every((v, k) => v === cols[k].n)) { addChatMsg("КОД ВЕРНЫЙ!"); setTimeout(lvl2, 1200); }
+            else { ent.length = 0; addChatMsg("НЕВЕРНО! Введите снова", "#ef4444"); }
         }
-        const friendMesh = createMegAgentModel();
-        friendMesh.visible = false;
-        scene.add(friendMesh);
+    }, `Кнопка: ${c.n}`));
 
-        if (typeof THREE.GLTFLoader === 'function') {
-            const gltfLoader = new THREE.GLTFLoader();
-            gltfLoader.load('./meg_agent.glb', (gltf) => {
-                const customModel = gltf.scene;
-                customModel.traverse((child) => {
-                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-                });
-                while (friendMesh.children.length > 0) friendMesh.remove(friendMesh.children.at(0));
-                friendMesh.add(customModel);
-                friendMesh.userData.isCustomGLB = true;
-            }, undefined, () => {});
+    spIt("water", 0, 0.2, 0);
+    addChatMsg("Уровень 1: Запомните цвета машин №1–№4 и введите у лифта");
+}
+function lvl0() {
+    clr(); st = "L0"; setLampHum(true); rig.position.set(0, 1.65, 0); yaw = pitch = 0;
+    box(0, -0.1, -5, 26, 0.2, 18, mF, false); box(-6, -0.1, -18, 10, 0.2, 8, mF, false); box(6, -0.1, -18, 10, 0.2, 8, mF, false);
+    box(0, -0.1, -15, 2, 0.2, 2, mF, false); box(0, -0.1, -21, 2, 0.2, 2, mF, false); box(0, 3.3, -10, 32, 0.2, 32, mCeil, false);
+    box(0, 1.6, 3.5, 22, 3.2, 0.4, mW); box(-11, 1.6, -9, 0.4, 3.2, 26, mW); box(11, 1.6, -9, 0.4, 3.2, 26, mW);
+    box(-4, 1.6, -4, 0.4, 3.2, 8, mW); box(4, 1.6, -5, 0.4, 3.2, 7, mW);
+    box(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, mW); box(-3.2, 1, -13.5, 2, 2, 0.5, mW); box(-3.2, 2.9, -13.5, 2, 0.6, 0.5, mW);
+    box(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x09090b })); box(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, mW);
+
+    const d0 = box(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.85 }));
+    const sps = [];
+    for (let i = 0; i < 3; i++) {
+        const s = box(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 }));
+        s.visible = false; sps.push(s);
+    }
+
+    box(0, -4.2, -18, 28, 0.3, 24, mF, false); box(0, -2.6, -14, 26, 3.2, 0.4, mW); box(0, -2.6, -22, 26, 3.2, 0.4, mW);
+    box(-3, -2.4, -14.25, 1.2, 0.8, 0.05, mA); box(4, -2.4, -14.25, 1.2, 0.8, 0.05, mA);
+    box(11.5, -3.2, -18, 2.5, 1.8, 2.5, new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.85 }));
+
+    const bac = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.3, 10), new THREE.MeshStandardMaterial({ color: 0x09090b }));
+    bac.position.set(-10, -3, -18); bac.visible = false; wg.add(bac);
+
+    addL(0, 3, -3); addL(0, 3, -16);
+    spIt("ladder", -7.5, 0.2, -1.5); spIt("ladder", 7.5, 0.2, -8.5); spIt("ladder", 1.2, 0.2, -2);
+    spIt("key", -3.2, 2.25, -13.4); spIt("water", -7, 0.2, -9);
+
+    ld = { sps, pl: 0, d0, op: false, pit: false, bac };
+    addChatMsg("Уровень 0: Соберите 3 части лестницы под нишу с ключом");
+}
+
+function lvl1() {
+    unlk(1); clr(); st = "L1"; setLampHum(false); rig.position.set(0, 1.65, 8); yaw = pitch = 0;
+    const fl = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.9, metalness: 0.0 });
+    box(0, -0.1, -6, 24, 0.2, 34, fl, false); box(0, 3.4, -6, 24, 0.2, 34, mC, false);
+    box(0, 1.6, 10, 24, 3.2, 0.4, mC); box(0, 1.6, -22, 24, 3.2, 0.4, mC);
+    addL(0, 3.2, 2, 0xe2e8f0); addL(0, 3.2, -12, 0xe2e8f0);
+
+    const cols = [{ n: "КРАСНЫЙ", h: "#ef4444", c: 0xef4444 }, { n: "СИНИЙ", h: "#3b82f6", c: 0x3b82f6 }, { n: "ЗЕЛЁНЫЙ", h: "#22c55e", c: 0x22c55e }, { n: "ЖЁЛТЫЙ", h: "#eab308", c: 0xeab308 }].sort(() => Math.random() - 0.5);
+    const pos = [{ x: -7, z: 4 }, { x: 7, z: 4 }, { x: -7, z: -4 }, { x: 7, z: -4 }, { x: -7, z: -12 }, { x: 7, z: -12 }];
+    let ci = 0;
+    pos.forEach((p, i) => {
+        box(p.x, 1.6, p.z - 2.5, 6, 3.2, 0.3, mC); box(p.x, 1.6, p.z + 2.5, 6, 3.2, 0.3, mC);
+        if (i === 1 || i === 4) box(p.x, 0.6, p.z, 3.5, 1.1, 1.8, new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 }));
+        else if (ci < 4) {
+            const cl = cols[ci];
+            box(p.x, 0.6, p.z, 3.5, 1, 1.7, new THREE.MeshStandardMaterial({ color: cl.c, roughness: 0.5 }));
+            const sg = new THREE.Mesh(new THREE.CircleGeometry(0.5, 20), new THREE.MeshStandardMaterial({ map: mkTex("s", "№" + (ci + 1), "#0f172a", cl.h) }));
+            sg.position.set(p.x > 0 ? p.x - 2.8 : p.x + 2.8, 1.8, p.z);
+            sg.rotation.y = p.x > 0 ? -Math.PI / 2 : Math.PI / 2;
+            wg.add(sg); ci++;
         }
+    });
 
-        let eventSource = null;
-        function connectToRoomStream(code) {
-            if (eventSource) eventSource.close();
-            eventSource = new EventSource(`${DB_URL}/rooms/${code}/players.json`);
-            const applyData = (data) => {
-                if (!data) return;
-                for (let [pid, pd] of Object.entries(data)) {
-                    if (pid !== myPlayerId && pd && pd.x !== undefined) {
-                        friendMesh.visible = true;
-                        friendMesh.userData.targetPos.set(pd.x, pd.y, pd.z);
-                        friendMesh.userData.targetYaw = pd.yaw || 0;
-                        friendMesh.userData.isWalking = pd.walking || false;
-                    }
-                }
-            };
-            eventSource.addEventListener('put', (e) => { const m = JSON.parse(e.data); if (m && m.data) applyData(m.data); });
-            eventSource.addEventListener('patch', (e) => { const m = JSON.parse(e.data); if (m && m.data) applyData(m.data); });
+    const ent = [];
+    cols.forEach((c, i) => addB(-1.5 + i, 1.5, -21.6, 0.8, 0.45, c.n, c.h, "#fff", () => {
+        ent.push(c.n); addChatMsg(c.n + " (" + ent.length + "/4)");
+        if (ent.length === 4) {
+            if (ent.every((v, k) => v === cols[k].n)) { addChatMsg("КОД ВЕРНЫЙ!"); setTimeout(lvl2, 1200); }
+            else { ent.length = 0; addChatMsg("НЕВЕРНО! Введите снова", "#ef4444"); }
         }
+    }, `Кнопка: ${c.n}`));
 
-        setInterval(() => {
-            if (!isCoop || !roomCode || !isBooted) return;
-            fetch(`${DB_URL}/rooms/${roomCode}/players/${myPlayerId}.json`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    x: playerRig.position.x, y: playerRig.position.y - 1.65, z: playerRig.position.z,
-                    yaw: gyroYaw + yawOffset, walking: (leftGesture === "POINT" || leftGesture === "VICTORY")
-                })
-            }).catch(() => {});
-        }, 120);
+    spIt("water", 0, 0.2, 0);
+    addChatMsg("Уровень 1: Запомните цвета машин №1–№4 и введите у лифта");
+}
+function lvl2() {
+    unlk(2); clr(); st = "L2"; rig.position.set(0, 1.65, 9); yaw = pitch = 0;
+    const fl = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.9 });
+    box(0, -0.1, -5, 24, 0.2, 32, fl, false); box(0, 3.4, -5, 24, 0.2, 32, mC, false);
+    addL(0, 3.2, 2, 0xe2e8f0); addL(0, 3.2, -12, 0xe2e8f0);
 
-        let leftGesture = "NONE", rightGesture = "NONE", cursorMode = false, lastThumbTime = 0, handNearMouth = false;
+    [{ x: -7, z: 4 }, { x: 7, z: 4 }, { x: -7, z: -4 }, { x: 7, z: -4 }, { x: -7, z: -11 }].forEach((p) => {
+        box(p.x, 1.6, p.z - 2.2, 5, 3.2, 0.3, mC); box(p.x, 1.6, p.z + 2.2, 5, 3.2, 0.3, mC);
+        box(p.x > 0 ? p.x - 2.4 : p.x + 2.4, 1.3, p.z + 1.2, 0.15, 2.6, 1.4, mG);
+        spIt("key", p.x, 0.4, p.z);
+    });
 
-        async function startHandTracking() {
-            const video = document.getElementById('cam-video');
-            const procCanvas = document.createElement('canvas');
-            procCanvas.width = 96; procCanvas.height = 72;
-            const ctx = procCanvas.getContext('2d', { willReadFrequently: true });
+    box(0, 0.01, -18, 8, 0.2, 6, new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.8 }), false);
+    const dr = box(0, 1.4, -15, 2, 2.8, 0.2, mG);
+    box(0, 1.4, -21, 1.6, 2.6, 0.25, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+    addB(-1.5, 1.5, -15.3, 0.85, 0.42, "ЗАКРЫТЬ", "#ef4444", "#fff", () => { dr.position.x = 0; addChatMsg("Шлюз закрыт!"); }, "Кнопка шлюза");
+    addB(1.3, 1.5, -20.7, 0.95, 0.45, "ДВЕРЬ (5 КЛ)", "#22c55e", "#fff", () => { if (ld.kc >= 5) lvl3(); else addChatMsg("Ключей: " + ld.kc + "/5"); }, "Гермодверь");
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
-                video.srcObject = stream;
-                await video.play();
+    const ss = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 2, 14), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
+    ss.position.set(5, 1, -8); wg.add(ss);
+    ld = { kc: 0, ss };
+    addChatMsg("Уровень 2: Соберите 5 ключей от Кожекрада и закройте шлюз");
+}
 
-                const scanSide = (xStart, xEnd) => {
-                    const img = ctx.getImageData(0, 0, 96, 72).data;
-                    let sumX = 0, sumY = 0, count = 0, minX = 96, maxX = 0, minY = 72, maxY = 0;
-                    const pts = [];
+function lvl3() {
+    unlk(3); clr(); st = "L3"; rig.position.set(0, 1.65, 8); yaw = pitch = 0;
+    scene.fog = new THREE.FogExp2(0x050507, 0.11);
+    const fl = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    box(0, -0.1, -6, 22, 0.2, 30, fl, false); box(0, 3.2, -6, 22, 0.2, 30, fl, false);
+    addL(7.5, 2.8, -17, 0xfef08a, 0.8, 10);
+    addB(7.5, 1.5, -18, 1.0, 0.6, "ЛИФТ", "#eab308", "#090804", () => { scene.fog = new THREE.FogExp2(0x181408, 0.038); lvl4(); }, "Вызов лифта");
+    addChatMsg("Уровень 3: Очень тёмная парковка. Найдите лифт наверх");
+}
 
-                    for (let y = 4; y < 68; y++) {
-                        for (let x = xStart; x < xEnd; x++) {
-                            const i = (y * 96 + x) * 4;
-                            const r = img[i], g = img[i + 1], b = img[i + 2];
-                            if (r > 85 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 12) {
-                                sumX += x; sumY += y; count++;
-                                if (x < minX) minX = x; if (x > maxX) maxX = x;
-                                if (y < minY) minY = y; if (y > maxY) maxY = y;
-                                pts.push({ x, y });
-                            }
-                        }
-                    }
-                    if (count < 18) return { found: false, gest: "NONE", nx: 0, ny: 0, area: 0 };
+function lvl4() {
+    unlk(4); clr(); st = "L4"; rig.position.set(0, 1.65, 10); yaw = pitch = 0;
+    const fl = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.88 });
+    box(0, -0.1, -8, 26, 0.2, 38, fl, false);
+    const cl = addL(0, 3.1, -8, 0xffffff, 1.2, 35);
+    const gt = box(0, 1.6, 4, 8, 3.2, 0.3, new THREE.MeshStandardMaterial({ color: 0x475569 }));
+    let un = false;
+    addB(-7.5, 1.5, 6, 1.1, 0.45, "ПК: ВОРОТА", "#38bdf8", "#090804", () => { un = true; gt.visible = false; addChatMsg("Ворота открыты! Бегите мимо колонн 1–5"); }, "Терминал ворот");
 
-                    const cx = sumX / count, cy = sumY / count;
-                    const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-                    const aspect = bh / bw;
+    for (let i = 1; i <= 5; i++) {
+        const z = 1 - i * 4.2, cm = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 3.2, 20), mC);
+        cm.position.set(-3.5, 1.6, z); wg.add(cm);
+        const ns = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshStandardMaterial({ map: mkTex("s", "" + i, "#334155", "#fff") }));
+        ns.position.set(-3.5, 2, z + 0.66); wg.add(ns);
+    }
 
-                    const bins = new Array(6).fill(0);
-                    for (let p of pts) {
-                        if (p.y < cy - bh * 0.18) {
-                            const binIdx = Math.min(5, Math.max(0, Math.floor(((p.x - minX) / bw) * 6)));
-                            bins[binIdx]++;
-                        }
-                    }
-                    const peaks = bins.filter(v => v > 3).length;
+    box(5, 1.6, -16, 6, 3.2, 0.3, mC);
+    box(5, 1.4, -18.8, 1.5, 2.6, 0.2, new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+    const sm = new THREE.Mesh(new THREE.CircleGeometry(0.35, 20), new THREE.MeshBasicMaterial({ map: mkTex("s", ":)", "#000", "#fff") }));
+    sm.position.set(3, 1.5, -6); wg.add(sm);
+    ld = { cl, sm, un: () => un, fin: false };
+    addChatMsg("Уровень 4: Откройте ворота на ПК слева!");
+}
 
-                    let gest = "OPEN";
-                    if (peaks === 0 && aspect < 1.25) gest = "FIST";
-                    else if (peaks === 1 && aspect > 1.35) gest = (cx - minX > bw * 0.65) ? "PINKY" : "POINT";
-                    else if (peaks === 2) gest = "VICTORY";
-                    else if (peaks === 1 && aspect <= 1.35 && (minY < cy - bh * 0.35)) gest = "THUMB";
+let yaw = 0, pitch = 0, crouch = false, cr = 0, sprint = false;
+let joyX = 0, joyY = 0, joyId = null, lookId = null, lx = 0, ly = 0;
+const jz = document.getElementById("joy-zone"), js = document.getElementById("joy-stick");
 
-                    return { found: true, gest, nx: (cx / 96 - 0.5) * 0.85, ny: (0.5 - cy / 72) * 0.65 - 0.12, area: count };
+jz.addEventListener("touchstart", (e) => { const t = e.changedTouches.item(0); joyId = t.identifier; updJoy(t); });
+jz.addEventListener("touchmove", (e) => { for (let i = 0; i < e.changedTouches.length; i++) { const t = e.changedTouches.item(i); if (t.identifier === joyId) updJoy(t); } });
+jz.addEventListener("touchend", (e) => { for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches.item(i).identifier === joyId) { joyId = null; joyX = joyY = 0; js.style.transform = "translate(0,0)"; } } });
+function updJoy(t) {
+    const r = jz.getBoundingClientRect(), dx = t.clientX - (r.left + 57), dy = t.clientY - (r.top + 57);
+    const d = Math.min(35, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
+    joyX = Math.cos(a) * (d / 35); joyY = Math.sin(a) * (d / 35);
+    js.style.transform = `translate(${joyX * 35}px,${joyY * 35}px)`;
+}
+
+renderer.domElement.addEventListener("touchstart", (e) => { const t = e.changedTouches.item(0); lookId = t.identifier; lx = t.clientX; ly = t.clientY; });
+renderer.domElement.addEventListener("touchmove", (e) => { for (let i = 0; i < e.changedTouches.length; i++) { const t = e.changedTouches.item(i); if (t.identifier === lookId) { yaw -= (t.clientX - lx) * 0.006; pitch = Math.max(-1.25, Math.min(1.25, pitch - (t.clientY - ly) * 0.005)); lx = t.clientX; ly = t.clientY; } } });
+renderer.domElement.addEventListener("touchend", (e) => { for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches.item(i).identifier === lookId) lookId = null; } });
+
+let mDrag = false;
+renderer.domElement.onmousedown = (e) => { mDrag = true; lx = e.clientX; ly = e.clientY; };
+onmouseup = () => mDrag = false;
+onmousemove = (e) => { if (mDrag && active && !padOpen) { yaw -= (e.clientX - lx) * 0.005; pitch = Math.max(-1.25, Math.min(1.25, pitch - (e.clientY - ly) * 0.005)); lx = e.clientX; ly = e.clientY; } };
+function toggleCrouch() { crouch = !crouch; document.getElementById("btn-crouch").classList.toggle("on", crouch); }
+function updateTargetPrompt() {
+    const promptEl = document.getElementById("item-prompt");
+    const btnF = document.getElementById("btn-f");
+    if (padOpen) { promptEl.classList.remove("show"); btnF.classList.remove("show"); return null; }
+
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+    // Проверяем кнопки, предметы и места установки
+    let targetObj = null, targetLabel = "", actionFn = null;
+
+    const btnHits = ray.intersectObjects(btns.map((b) => b.m));
+    if (btnHits.length && btnHits.at(0).distance < 3.6) {
+        const b = btns.find((x) => x.m === btnHits.at(0).object);
+        if (b) { targetObj = b.m; targetLabel = b.label; actionFn = b.fn; }
+    }
+
+    if (!targetObj) {
+        const activeItems = itms.filter((it) => !it.tk && rig.position.distanceTo(it.m.position) < 2.6);
+        const itemHits = ray.intersectObjects(activeItems.map((it) => it.m));
+        if (itemHits.length) {
+            const it = activeItems.find((x) => x.m === itemHits.at(0).object);
+            if (it) {
+                targetObj = it.m;
+                targetLabel = it.label;
+                actionFn = () => {
+                    if (it.tp === "key" && st === "L0" && ld.pl < 3) { addChatMsg("Слишком высоко! Нужна лестница", "#ef4444"); return; }
+                    if (it.tp === "key" && st === "L2") { it.tk = true; it.m.visible = false; ld.kc++; addChatMsg("Ключ собран: " + ld.kc + "/5"); return; }
+                    if (storeItem(it.tp)) { it.tk = true; it.m.visible = false; addChatMsg("Подобрано: " + it.label); }
                 };
-
-                const loopVision = () => {
-                    if (video.readyState >= 2) {
-                        ctx.drawImage(video, 0, 0, 96, 72);
-                        const L = scanSide(2, 47);
-                        const R = scanSide(49, 94);
-                        if (L.found) {
-                            leftGesture = L.gest;
-                            leftHandMesh.position.x += (L.nx - leftHandMesh.position.x) * 0.35;
-                            leftHandMesh.position.y += (L.ny - leftHandMesh.position.y) * 0.35;
-                        } else leftGesture = "NONE";
-
-                        if (R.found) {
-                            rightGesture = R.gest;
-                            rightHandMesh.position.x += (R.nx - rightHandMesh.position.x) * 0.35;
-                            rightHandMesh.position.y += (R.ny - rightHandMesh.position.y) * 0.35;
-                            handNearMouth = R.area > 680;
-                            rightHandMesh.position.z = handNearMouth ? -0.18 : -0.42;
-                            if (R.gest === "THUMB" && Date.now() - lastThumbTime > 1200) {
-                                lastThumbTime = Date.now();
-                                cursorMode = !cursorMode;
-                                rHandVis.userData.laser.visible = cursorMode;
-                                setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН.");
-                            }
-                        } else { rightGesture = "NONE"; handNearMouth = false; }
-                    }
-                    requestAnimationFrame(loopVision);
-                };
-                loopVision();
-            } catch (e) {}
-        }
-        const worldGroup = new THREE.Group();
-        scene.add(worldGroup);
-
-        let interactiveButtons = [];
-        let worldItems = [];
-        let activeLevelData = {};
-
-        function setSubtitle(text) { document.getElementById('subtitle-box').innerText = text; }
-
-        function clearWorld() {
-            while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children.at(0));
-            interactiveButtons = [];
-            worldItems = [];
-            activeLevelData = {};
-            beltItem.visible = false;
-        }
-
-        function addCeilingLight(x, y, z, colorHex = 0xfef08a, intensity = 1.25, dist = 22) {
-            const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.04, 20), new THREE.MeshBasicMaterial({ color: colorHex }));
-            lamp.position.set(x, y + 0.08, z);
-            worldGroup.add(lamp);
-
-            const light = new THREE.PointLight(colorHex, intensity, dist);
-            light.position.set(x, y, z);
-            light.castShadow = true;
-            light.shadow.mapSize.width = 512;
-            light.shadow.mapSize.height = 512;
-            light.shadow.bias = -0.002;
-            worldGroup.add(light);
-            return light;
-        }
-
-        function create3DButton(x, y, z, w, h, label, bgHex, fgHex, onClickAction) {
-            const mat = new THREE.MeshStandardMaterial({ map: makeTex('sign', label, bgHex, fgHex), roughness: 0.3, metalness: 0.15 });
-            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.52, w * 0.52, 0.05, 28), mat);
-            mesh.rotation.x = Math.PI / 2;
-            mesh.scale.set(1, 1, h / w);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            worldGroup.add(mesh);
-            const btnObj = { mesh, action: onClickAction, cooldown: 0 };
-            interactiveButtons.push(btnObj);
-            return btnObj;
-        }
-
-        function buildWall(x, y, z, w, h, d, mat, shadow = true) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            m.position.set(x, y, z);
-            m.castShadow = shadow;
-            m.receiveShadow = true;
-            worldGroup.add(m);
-            return m;
-        }
-
-        function loadMenuScene() {
-            clearWorld();
-            currentState = "MENU";
-            scene.fog = new THREE.FogExp2(0x181408, 0.04);
-            playerRig.position.set(0, 1.65, 2.5);
-            document.getElementById('coop-bar').style.display = 'none';
-
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall, roughness: 0.75 });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor, roughness: 0.35, metalness: 0.15 });
-            buildWall(0, -0.1, 0, 16, 0.2, 16, fMat, false);
-            buildWall(0, 3.3, 0, 16, 0.2, 16, wMat, false);
-            buildWall(0, 1.6, -4, 16, 3.2, 0.4, wMat);
-            buildWall(0, 1.6, 5, 16, 3.2, 0.4, wMat);
-            buildWall(-5, 1.6, 0, 0.4, 3.2, 16, wMat);
-            buildWall(5, 1.6, 0, 0.4, 3.2, 16, wMat);
-
-            addCeilingLight(0, 3.1, 1.5, 0xfef08a, 1.3, 16);
-
-            create3DButton(0, 1.56, 1.98, 0.26, 0.26, "ИГРАТЬ", "#eab308", "#090804", () => {
-                loadLobbyScene();
-            });
-            setSubtitle("Протяните руку к маленькой кнопке «ИГРАТЬ» прямо перед лицом");
-        }
-
-        function loadLobbyScene() {
-            clearWorld();
-            currentState = "LOBBY";
-            playerRig.position.set(0, 1.65, 3.2);
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall, roughness: 0.75 });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor, roughness: 0.35, metalness: 0.15 });
-
-            buildWall(0, -0.1, 0, 18, 0.2, 18, fMat, false);
-            buildWall(0, 3.3, 0, 18, 0.2, 18, wMat, false);
-            buildWall(0, 1.6, -4.5, 18, 3.2, 0.4, wMat);
-            buildWall(-6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
-            buildWall(6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
-            addCeilingLight(0, 3.1, 2.2, 0xfef08a, 1.35, 18);
-
-            create3DButton(-0.28, 1.68, 2.62, 0.24, 0.24, "ОДИН", "#eab308", "#090804", () => {
-                isCoop = false;
-                document.getElementById('coop-bar').style.display = 'none';
-                setSubtitle("Выбран одиночный режим. Коснитесь сохранения уровня ниже!");
-            });
-
-            create3DButton(0.28, 1.68, 2.62, 0.24, 0.24, "CO-OP", "#38bdf8", "#090804", () => {
-                isCoop = true;
-                if (!roomCode) roomCode = String(Math.floor(1000 + Math.random() * 9000));
-                document.getElementById('my-room-code').innerText = roomCode;
-                document.getElementById('coop-bar').style.display = 'flex';
-                connectToRoomStream(roomCode);
-                setSubtitle(`Комната создана! Код для друга: ${roomCode}. Выберите уровень.`);
-            });
-
-            const levels = [
-                { name: "УР.0", fn: loadLevel0 },
-                { name: "УР.1", fn: loadLevel1 },
-                { name: "УР.2", fn: loadLevel2 },
-                { name: "УР.3", fn: loadLevel3 },
-                { name: "УР.4", fn: loadLevel4 }
-            ];
-
-            levels.forEach((lvl, idx) => {
-                const unlocked = idx <= maxUnlockedLevel;
-                create3DButton(-0.42 + idx * 0.21, 1.42, 2.62, 0.17, 0.17, unlocked ? lvl.name : "ЗАКР", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
-                    if (unlocked) lvl.fn();
-                    else setSubtitle("Сначала пройдите предыдущий уровень!");
-                });
-            });
-            setSubtitle("Лобби: коснитесь рукой режима (ОДИН / CO-OP) и сохранения уровня");
-        }
-
-        function joinFriendRoom() {
-            const code = document.getElementById('join-code-input').value.trim();
-            if (code.length === 4) {
-                isCoop = true; roomCode = code;
-                document.getElementById('my-room-code').innerText = roomCode;
-                connectToRoomStream(roomCode);
-                setSubtitle(`Вы подключились к комнате друга: ${roomCode}!`);
             }
         }
-        function unlockLevel(lvlNum) {
-            if (lvlNum > maxUnlockedLevel) {
-                maxUnlockedLevel = lvlNum;
-                localStorage.setItem('backrooms_vr_save', String(maxUnlockedLevel));
-            }
+    }
+
+    if (!targetObj && st === "L0") {
+        const cur = invState.main;
+        if (cur === "ladder" && Math.hypot(rig.position.x + 3.2, rig.position.z + 12.5) < 2.8) {
+            targetObj = ld.sps.at(0); targetLabel = "Установить ступеньку";
+            actionFn = () => { ld.sps.at(ld.pl).visible = true; ld.pl++; invState.main = null; renderInv(); addChatMsg("Ступенька установлена (" + ld.pl + "/3)"); };
+        } else if (cur === "key" && !ld.op && Math.hypot(rig.position.x + 1.5, rig.position.z + 13) < 2.4) {
+            targetObj = ld.d0; targetLabel = "Открыть дверь ключом";
+            actionFn = () => { ld.op = true; invState.main = null; renderInv(); ld.d0.visible = false; addChatMsg("Дверь открыта! Впереди квадратная яма"); };
         }
+    }
 
-        function spawnWorldItem(type, x, y, z, colorHex = 0x92400e) {
-            let mesh;
-            if (type === 'water') {
-                mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.24, 18), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.2 }));
-            } else if (type === 'key') {
-                mesh = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.025, 12, 24), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.2, metalness: 0.85 }));
-            } else {
-                mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.68, 14), new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.6 }));
-                mesh.rotation.z = Math.PI / 2;
-            }
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            worldGroup.add(mesh);
-            worldItems.push({ type, mesh, taken: false });
-            return mesh;
+    if (targetObj) {
+        btnF.classList.add("show");
+        const wp = new THREE.Vector3();
+        targetObj.getWorldPosition(wp);
+        wp.y += 0.35;
+        wp.project(camera);
+        if (wp.z < 1) {
+            const w = document.documentElement.clientWidth || window.innerWidth;
+            const h = document.documentElement.clientHeight || window.innerHeight;
+            promptEl.style.left = ((wp.x * 0.5 + 0.5) * w) + "px";
+            promptEl.style.top = ((-(wp.y * 0.5) + 0.5) * h) + "px";
+            document.getElementById("ip-name").innerText = targetLabel;
+            promptEl.classList.add("show");
         }
+    } else {
+        promptEl.classList.remove("show");
+        btnF.classList.remove("show");
+    }
+    return actionFn;
+}
 
-        function loadLevel0() {
-            clearWorld();
-            currentState = "LEVEL_0";
-            playerRig.position.set(0, 1.65, 0);
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall, roughness: 0.75 });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor, roughness: 0.35, metalness: 0.15 });
-            const aMat = new THREE.MeshStandardMaterial({ map: texArrow });
+let currentAction = null;
+function doInteract() { if (currentAction) currentAction(); }
 
-            buildWall(0, -0.1, -5, 26, 0.2, 18, fMat, false);
-            buildWall(-6, -0.1, -18, 10, 0.2, 8, fMat, false);
-            buildWall(6, -0.1, -18, 10, 0.2, 8, fMat, false);
-            buildWall(0, -0.1, -15, 2, 0.2, 2, fMat, false);
-            buildWall(0, -0.1, -21, 2, 0.2, 2, fMat, false);
-            buildWall(0, 3.3, -10, 32, 0.2, 32, wMat, false);
-
-            buildWall(0, 1.6, 3.5, 22, 3.2, 0.4, wMat);
-            buildWall(-11, 1.6, -9, 0.4, 3.2, 26, wMat);
-            buildWall(11, 1.6, -9, 0.4, 3.2, 26, wMat);
-            buildWall(-4, 1.6, -4, 0.4, 3.2, 8, wMat);
-            buildWall(4, 1.6, -5, 0.4, 3.2, 7, wMat);
-
-            buildWall(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, wMat);
-            buildWall(-3.2, 1.0, -13.5, 2.0, 2.0, 0.5, wMat);
-            buildWall(-3.2, 2.9, -13.5, 2.0, 0.6, 0.5, wMat);
-            buildWall(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x09090b }));
-            buildWall(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, wMat);
-
-            const door0 = buildWall(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.5 }));
-            const steps = [];
-            for (let i = 0; i < 3; i++) {
-                const s = buildWall(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6 }));
-                s.visible = false; steps.push(s);
-            }
-
-            buildWall(0, -4.2, -18, 28, 0.3, 24, fMat, false);
-            buildWall(0, -2.6, -14, 26, 3.2, 0.4, wMat);
-            buildWall(0, -2.6, -22, 26, 3.2, 0.4, wMat);
-            buildWall(-3, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
-            buildWall(4, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
-            buildWall(11.5, -3.2, -18, 2.5, 1.8, 2.5, new THREE.MeshStandardMaterial({ color: 0x57534e }));
-
-            const bac = new THREE.Group();
-            const bacMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.3 });
-            const bacCore = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 2.3, 12), bacMat);
-            const bacArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 1.4, 10), bacMat);
-            bacArmL.position.set(-0.25, 0.3, 0); bacArmL.rotation.z = 0.4;
-            const bacArmR = bacArmL.clone(); bacArmR.position.x = 0.25; bacArmR.rotation.z = -0.4;
-            bac.add(bacCore, bacArmL, bacArmR);
-            bac.position.set(-10, -3.0, -18); bac.visible = false; worldGroup.add(bac);
-
-            addCeilingLight(0, 3.1, -3, 0xfef08a, 1.3, 24);
-            addCeilingLight(0, 3.1, -16, 0xfef08a, 1.1, 22);
-
-            spawnWorldItem('ladder', -7.5, 0.2, -1.5);
-            spawnWorldItem('ladder', 7.5, 0.2, -8.5);
-            spawnWorldItem('ladder', 1.2, 0.2, -2.0);
-            spawnWorldItem('key', -3.2, 2.25, -13.4);
-            spawnWorldItem('water', -7.0, 0.2, -9.0);
-
-            activeLevelData = { steps, placed: 0, door0, doorOpen: false, inPit: false, bac };
-            setSubtitle("Уровень 0: Соберите 3 части лестницы (кулак ✊) под квадратную дыру в стене");
+function tick() {
+    if (!active) {
+        if (st === "MENU") {
+            camera.rotation.order = "YXZ";
+            camera.rotation.y = yaw + Math.sin(Date.now() * 0.0004) * 0.08;
+            camera.rotation.x = 0;
+            renderer.render(scene, camera);
         }
-        function loadLevel1() {
-            unlockLevel(1);
-            clearWorld();
-            currentState = "LEVEL_1";
-            playerRig.position.set(0, 1.65, 8);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete, roughness: 0.6 });
-            const floorConcrete = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.22, metalness: 0.35 });
+        return;
+    }
 
-            buildWall(0, -0.1, -6, 24, 0.2, 34, floorConcrete, false);
-            buildWall(0, 3.4, -6, 24, 0.2, 34, cMat, false);
-            buildWall(0, 1.6, 10, 24, 3.2, 0.4, cMat);
-            buildWall(0, 1.6, -22, 24, 3.2, 0.4, cMat);
-            addCeilingLight(0, 3.2, 2, 0xe2e8f0, 1.2, 25);
-            addCeilingLight(0, 3.2, -12, 0xe2e8f0, 1.2, 25);
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+    cr += ((crouch ? -0.65 : 0) - cr) * 0.15;
 
-            const colors = [
-                { name: "КРАСНЫЙ", hex: "#ef4444", num: 0xef4444 },
-                { name: "СИНИЙ", hex: "#3b82f6", num: 0x3b82f6 },
-                { name: "ЗЕЛЁНЫЙ", hex: "#22c55e", num: 0x22c55e },
-                { name: "ЖЁЛТЫЙ", hex: "#eab308", num: 0xeab308 }
-            ].sort(() => Math.random() - 0.5);
+    currentAction = updateTargetPrompt();
 
-            const positions = [
-                { bx: -7, bz: 4 },
-                { bx: 7, bz: 4 },
-                { bx: -7, bz: -4 },
-                { bx: 7, bz: -4 },
-                { bx: -7, bz: -12 },
-                { bx: 7, bz: -12 }
-            ];
-            let carIdx = 0;
-            positions.forEach((pos, i) => {
-                const bx = pos.bx, bz = pos.bz;
-                buildWall(bx, 1.6, bz - 2.5, 6, 3.2, 0.3, cMat);
-                buildWall(bx, 1.6, bz + 2.5, 6, 3.2, 0.3, cMat);
-                if (i === 1 || i === 4) {
-                    const tarp = new THREE.Mesh(new THREE.SphereGeometry(1.55, 20, 14), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 }));
-                    tarp.scale.set(1.2, 0.55, 0.7); tarp.position.set(bx, 0.45, bz); tarp.castShadow = true;
-                    worldGroup.add(tarp);
-                } else if (carIdx < 4) {
-                    const col = colors[carIdx];
-                    const carMat = new THREE.MeshStandardMaterial({ color: col.num, roughness: 0.15, metalness: 0.75 });
-                    const carBody = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.75, 3.4, 20), carMat);
-                    carBody.rotation.z = Math.PI / 2; carBody.scale.set(0.75, 1, 1.15);
-                    carBody.position.set(bx, 0.55, bz); carBody.castShadow = true;
-                    const cabin = new THREE.Mesh(new THREE.SphereGeometry(0.85, 18, 14), carMat);
-                    cabin.scale.set(1.3, 0.65, 0.9); cabin.position.set(bx, 0.95, bz);
-                    worldGroup.add(carBody, cabin);
+    const moving = !padOpen && Math.hypot(joyX, joyY) > 0.08;
+    const isRunning = moving && sprint && !crouch;
+    const spd = (isRunning ? 0.098 : moving ? 0.05 : 0) * (bst > 0 ? 1.35 : 1);
 
-                    const sign = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), new THREE.MeshStandardMaterial({ map: makeTex('sign', `№${carIdx + 1}`, "#0f172a", col.hex) }));
-                    sign.position.set(bx > 0 ? bx - 2.8 : bx + 2.8, 1.8, bz);
-                    sign.rotation.y = bx > 0 ? -Math.PI / 2 : Math.PI / 2;
-                    worldGroup.add(sign);
-                    carIdx++;
-                }
-            });
+    if (moving) {
+        const fwd = -joyY * spd, str = joyX * spd;
+        rig.position.x += -Math.sin(yaw) * fwd + Math.cos(yaw) * str;
+        rig.position.z += -Math.cos(yaw) * fwd - Math.sin(yaw) * str;
+    }
 
-            const enteredCode = [];
-            colors.forEach((c, idx) => {
-                create3DButton(-1.5 + idx * 1.0, 1.5, -21.6, 0.75, 0.45, c.name, c.hex, "#ffffff", () => {
-                    enteredCode.push(c.name);
-                    setSubtitle(`Введён цвет: ${c.name} (${enteredCode.length}/4)`);
-                    if (enteredCode.length === 4) {
-                        const ok = enteredCode.every((val, k) => val === colors[k].name);
-                        if (ok) {
-                            setSubtitle("КОД ВЕРНЫЙ! Лифт поднимает вас на Уровень 2 (Кожекрад)...");
-                            setTimeout(loadLevel2, 1500);
-                        } else {
-                            enteredCode.length = 0;
-                            setSubtitle("НЕВЕРНЫЙ КОД! Попробуйте ввести 4 цвета заново.");
-                        }
-                    }
-                });
-            });
+    // Плавное дыхание-покачивание в покое (Idle) + анимация рук при беге (Sprint)
+    idlePhase += 0.035;
+    sprintBlend += ((isRunning ? 1 : 0) - sprintBlend) * 0.12;
+    if (isRunning) sprintPhase += 0.24;
 
-            spawnWorldItem('water', 0, 0.2, 0);
-            setSubtitle("Уровень 1: Найдите 4 открытые машины в комнатах (№1-№4) и введите цвета у лифта (👍 -> ☝️)");
+    const waveL = Math.sin(sprintPhase), waveR = Math.sin(sprintPhase + Math.PI);
+    sprintArmL.visible = sprintBlend > 0.02;
+    sprintArmR.visible = sprintBlend > 0.02;
+    sprintArmL.position.y = -0.58 + sprintBlend * (0.36 + Math.max(0, waveL) * 0.08);
+    sprintArmR.position.y = -0.58 + sprintBlend * (0.36 + Math.max(0, waveR) * 0.08);
+    sprintArmL.position.z = -0.36 - sprintBlend * (0.06 + waveL * 0.09);
+    sprintArmR.position.z = -0.36 - sprintBlend * (0.06 + waveR * 0.09);
+    sprintArmL.rotation.x = sprintBlend * waveL * 0.35;
+    sprintArmR.rotation.x = sprintBlend * waveR * 0.35;
+
+    const idleSwayY = (1 - sprintBlend) * Math.sin(idlePhase) * 0.015;
+    const idleSwayZ = (1 - sprintBlend) * Math.cos(idlePhase * 0.7) * 0.006;
+    const runBobY = sprintBlend * Math.abs(Math.sin(sprintPhase)) * 0.045;
+
+    camera.position.y = cr + idleSwayY + runBobY;
+    camera.rotation.z = idleSwayZ + sprintBlend * Math.sin(sprintPhase) * 0.018;
+
+    if (fr.visible) {
+        fr.position.lerp(fr.userData.tp, 0.18);
+        fr.rotation.y += (fr.userData.ty - fr.rotation.y) * 0.18;
+        if (fr.userData.wk) {
+            fr.userData.wp += 0.15;
+            const s = Math.sin(fr.userData.wp) * 0.4;
+            fr.userData.lL.rotation.x = s;
+            fr.userData.lR.rotation.x = -s;
         }
-        function loadLevel2() {
-            unlockLevel(2);
-            clearWorld();
-            currentState = "LEVEL_2";
-            playerRig.position.set(0, 1.65, 9);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete, roughness: 0.6 });
-            const floorConcrete = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.22, metalness: 0.35 });
-            const gMat = new THREE.MeshStandardMaterial({ map: texGridDoor, roughness: 0.4, metalness: 0.5 });
-            const tMat = new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.18, metalness: 0.2 });
+    }
 
-            buildWall(0, -0.1, -5, 24, 0.2, 32, floorConcrete, false);
-            buildWall(0, 3.4, -5, 24, 0.2, 32, cMat, false);
-            addCeilingLight(0, 3.2, 2, 0xe2e8f0, 1.1, 24);
-            addCeilingLight(0, 3.2, -12, 0xe2e8f0, 1.1, 24);
-
-            const keySpots = [
-                { kx: -7, kz: 4 },
-                { kx: 7, kz: 4 },
-                { kx: -7, kz: -4 },
-                { kx: 7, kz: -4 },
-                { kx: -7, kz: -11 }
-            ];
-            keySpots.forEach((spot) => {
-                const kx = spot.kx, kz = spot.kz;
-                buildWall(kx, 1.6, kz - 2.2, 5, 3.2, 0.3, cMat);
-                buildWall(kx, 1.6, kz + 2.2, 5, 3.2, 0.3, cMat);
-                buildWall(kx > 0 ? kx - 2.4 : kx + 2.4, 1.3, kz + 1.2, 0.15, 2.6, 1.4, gMat);
-                spawnWorldItem('key', kx, 0.4, kz);
-            });
-
-            buildWall(0, 0.01, -18, 8, 0.2, 6, tMat, false);
-            const airlockOuterDoor = buildWall(0, 1.4, -15, 2.0, 2.8, 0.2, gMat);
-            buildWall(0, 1.4, -21, 1.6, 2.6, 0.25, new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6 }));
-            let airlockClosed = false;
-
-            create3DButton(-1.5, 1.5, -15.3, 0.75, 0.4, "ЗАКРЫТЬ ШЛЮЗ", "#ef4444", "#ffffff", () => {
-                airlockClosed = true;
-                airlockOuterDoor.position.x = 0;
-                setSubtitle("Вход в шлюз закрыт! Кожекрад не достанет.");
-            });
-
-            create3DButton(1.3, 1.5, -20.7, 0.85, 0.45, "ГЕРМОДВЕРЬ (5 КЛ.)", "#22c55e", "#ffffff", () => {
-                if (activeLevelData.keysCollected >= 5) {
-                    setSubtitle("Все 5 замков провернуты! Переход на Тёмную двухэтажную парковку...");
-                    setTimeout(loadLevel3, 1500);
-                } else {
-                    setSubtitle(`Нужно 5 ключей из комнат! Собрано: ${activeLevelData.keysCollected}/5`);
-                }
-            });
-
-            const skinStealer = new THREE.Group();
-            const ssMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.35 });
-            const ssTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 1.4, 16), ssMat);
-            const ssHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), ssMat);
-            ssHead.position.y = 0.85;
-            skinStealer.add(ssTorso, ssHead);
-            skinStealer.position.set(5, 1.05, -8);
-            skinStealer.castShadow = true;
-            worldGroup.add(skinStealer);
-
-            activeLevelData = { keysCollected: 0, skinStealer, airlockClosed: () => airlockClosed };
-            setSubtitle("Уровень 2: Соберите 5 ключей в комнатах с сеткой и укройтесь от Кожекрада в шлюзе!");
+    if (st === "L0") {
+        if (!ld.pit && ld.op && Math.abs(rig.position.x) < 1.2 && Math.abs(rig.position.z + 18) < 1.2) {
+            ld.pit = true; rig.position.y = -2.35; ld.bac.visible = true;
+            addChatMsg("ВЫ УПАЛИ В ЯМУ! Бегите по стрелочкам вправо!", "#ef4444");
         }
-
-        function loadLevel3() {
-            unlockLevel(3);
-            clearWorld();
-            currentState = "LEVEL_3";
-            playerRig.position.set(0, 1.65, 8);
-            scene.fog = new THREE.FogExp2(0x050507, 0.11);
-            const cMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
-
-            buildWall(0, -0.1, -6, 22, 0.2, 30, cMat, false);
-            buildWall(0, 3.2, -6, 22, 0.2, 30, cMat, false);
-            addCeilingLight(7.5, 2.8, -17, 0xfef08a, 0.8, 10);
-
-            create3DButton(7.5, 1.5, -18, 0.9, 0.6, "ЛИФТ НАВЕРХ", "#eab308", "#090804", () => {
-                scene.fog = new THREE.FogExp2(0x181408, 0.042);
-                loadLevel4();
-            });
-            spawnWorldItem('water', -4, 0.2, -2);
-            setSubtitle("Уровень 3: Очень тёмная парковка. Найдите в темноте кнопку лифта наверх!");
+        if (ld.pit) {
+            const bx = rig.position.x - ld.bac.position.x, bz = rig.position.z - ld.bac.position.z, d = Math.hypot(bx, bz);
+            if (d > 0.4) { ld.bac.position.x += (bx / d) * 0.042; ld.bac.position.z += (bz / d) * 0.042; }
+            if (rig.position.x > 11) lvl1();
         }
-        function loadLevel4() {
-            unlockLevel(4);
-            clearWorld();
-            currentState = "LEVEL_4";
-            playerRig.position.set(0, 1.65, 10);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete, roughness: 0.5 });
-            const floorConcrete = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.2, metalness: 0.4 });
-
-            buildWall(0, -0.1, -8, 26, 0.2, 38, floorConcrete, false);
-            const ceilingLight = addCeilingLight(0, 3.1, -8, 0xffffff, 1.3, 35);
-
-            const gate = buildWall(0, 1.6, 4, 8, 3.2, 0.3, new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6 }));
-            let gateUnlocked = false;
-
-            create3DButton(-7.5, 1.5, 6, 0.95, 0.45, "ПК: ОТКРЫТЬ ВОРОТА", "#38bdf8", "#090804", () => {
-                gateUnlocked = true;
-                gate.visible = false;
-                setSubtitle("Доступ разрешён! Ворота открыты. Осторожно: в зале мигает свет и бегают Улыбашки!");
-            });
-
-            for (let i = 1; i <= 5; i++) {
-                const colZ = 1 - i * 4.2;
-                const colMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 3.2, 24), cMat);
-                colMesh.position.set(-3.5, 1.6, colZ);
-                colMesh.castShadow = true; colMesh.receiveShadow = true;
-                worldGroup.add(colMesh);
-
-                const numSign = new THREE.Mesh(new THREE.CircleGeometry(0.45, 24), new THREE.MeshStandardMaterial({ map: makeTex('sign', String(i), "#334155", "#ffffff") }));
-                numSign.position.set(-3.5, 2.0, colZ + 0.66);
-                worldGroup.add(numSign);
-            }
-
-            buildWall(5, 1.6, -16, 6, 3.2, 0.3, cMat);
-            buildWall(5, 1.4, -18.8, 1.5, 2.6, 0.2, new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x15803d, emissiveIntensity: 0.4 }));
-
-            const smiler = new THREE.Mesh(new THREE.CircleGeometry(0.35, 24), new THREE.MeshBasicMaterial({ map: makeTex('sign', ":)", "#000000", "#ffffff") }));
-            smiler.position.set(3, 1.5, -6);
-            worldGroup.add(smiler);
-
-            activeLevelData = { ceilingLight, smiler, gateUnlocked: () => gateUnlocked, betaFinished: false };
-            setSubtitle("Уровень 4: Подойдите к воротам, затем разрешите открытие на ПК в Хабе слева!");
+    } else if (st === "L4" && !ld.fin) {
+        const on = Math.sin(Date.now() * 0.002) > -0.2;
+        ld.cl.intensity = on ? 1.2 : 0.05;
+        if (!on && ld.un()) {
+            const sx = rig.position.x - ld.sm.position.x, sz = rig.position.z - ld.sm.position.z, sd = Math.hypot(sx, sz);
+            if (sd > 0.5) { ld.sm.position.x += (sx / sd) * 0.055; ld.sm.position.z += (sz / sd) * 0.055; }
         }
-
-        let gyroYaw = 0, gyroPitch = 0, yawOffset = 0, currentCrouch = 0;
-        let sanity = 100, speedBoost = 0, heldItem = null, beltHasWater = false;
-
-        window.addEventListener('deviceorientation', (e) => {
-            if (e.alpha === null) return;
-            const d2r = Math.PI / 180;
-            const a = e.alpha * d2r, b = e.beta * d2r, g = e.gamma * d2r;
-            const cA = Math.cos(a), sA = Math.sin(a);
-            const cB = Math.cos(b), sB = Math.sin(b);
-            const cG = Math.cos(g), sG = Math.sin(g);
-
-            const vx = -cA * sG - sA * sB * cG;
-            const vy = -sA * sG + cA * sB * cG;
-            const vz = -cB * cG;
-
-            gyroYaw = Math.atan2(-vx, -vy);
-            gyroPitch = Math.max(-1.25, Math.min(1.25, Math.asin(Math.max(-1, Math.min(1, vz)))));
-        });
-
-        let drag = false, px = 0, py = 0;
-        window.addEventListener('pointerdown', (e) => { if (isBooted) { drag = true; px = e.clientX; py = e.clientY; } });
-        window.addEventListener('pointermove', (e) => {
-            if (!drag || !isBooted) return;
-            yawOffset -= (e.clientX - px) * 0.006;
-            gyroPitch = Math.max(-1.2, Math.min(1.2, gyroPitch - (e.clientY - py) * 0.005));
-            px = e.clientX; py = e.clientY;
-        });
-        window.addEventListener('pointerup', () => { drag = false; });
-
-        function recenterHead() { yawOffset = -gyroYaw; }
-        function toggleStereo() {
-            isStereo = !isStereo;
-            document.getElementById('vr-divider').style.display = isStereo ? 'block' : 'none';
+        if (Math.hypot(rig.position.x - 5, rig.position.z + 18.5) < 1.5) {
+            ld.fin = true; document.getElementById("end").classList.add("on"); setTimeout(toTermMenu, 6500);
         }
-        function returnToMenu() {
-            document.getElementById('beta-end-screen').classList.remove('visible');
-            loadMenuScene();
-        }
+    }
 
-        function bootVR(stereoMode) {
-            isStereo = stereoMode;
-            document.getElementById('vr-divider').style.display = stereoMode ? 'block' : 'none';
-            document.getElementById('boot-overlay').classList.add('hidden');
-            document.getElementById('hud').style.display = 'block';
+    if (bst > 0) bst--;
+    if (st.startsWith("L")) san = Math.max(0, san - 0.006);
+    const rt = san / 100;
+    const cssCol = rt > 0.5 ? "#22c55e" : rt > 0.25 ? "#eab308" : "#ef4444";
+    document.getElementById("san-fill").style.height = Math.max(5, rt * 100) + "%";
+    document.getElementById("san-fill").style.background = cssCol;
+    document.getElementById("san-pct").style.color = cssCol;
+    document.getElementById("san-pct").innerText = Math.ceil(san) + "%";
+    document.getElementById("vig").style.boxShadow = `inset 0 0 ${Math.floor((1 - rt) * 120)}px rgba(0,0,0,0.95)`;
 
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().catch(() => {});
-            }
-
-            isBooted = true;
-            loadMenuScene();
-            startHandTracking().catch(() => {});
-        }
-        function updateFingerPose(handVis, gest) {
-            const f = handVis.userData.fingers;
-            if (!f || f.length < 4) return;
-            f[0].scale.y = (gest === "POINT" || gest === "VICTORY" || gest === "OPEN" || gest === "NONE") ? 1.0 : 0.35;
-            f[1].scale.y = (gest === "VICTORY" || gest === "OPEN" || gest === "NONE") ? 1.0 : 0.35;
-            f[2].scale.y = (gest === "OPEN" || gest === "NONE") ? 1.0 : 0.35;
-            f[3].scale.y = (gest === "PINKY" || gest === "OPEN" || gest === "NONE") ? 1.0 : 0.35;
-            if (handVis.userData.thumb) {
-                handVis.userData.thumb.rotation.x = (gest === "THUMB") ? 0.6 : 0;
-            }
-        }
-
-        function updateWorld() {
-            if (!isBooted) return;
-
-            const totalYaw = gyroYaw + yawOffset;
-            camera.rotation.order = 'YXZ';
-            camera.rotation.y = totalYaw;
-            camera.rotation.x = Math.max(-1.25, Math.min(1.25, gyroPitch));
-            camera.rotation.z = 0;
-
-            const targetCrouch = (leftGesture === "PINKY") ? -0.65 : 0;
-            currentCrouch += (targetCrouch - currentCrouch) * 0.15;
-            camera.position.set(0, currentCrouch, 0);
-
-            updateFingerPose(lHandVis, leftGesture);
-            updateFingerPose(rHandVis, rightGesture);
-
-            if (friendMesh.visible) {
-                friendMesh.position.lerp(friendMesh.userData.targetPos, 0.18);
-                friendMesh.rotation.y += (friendMesh.userData.targetYaw - friendMesh.rotation.y) * 0.18;
-                if (friendMesh.userData.isWalking && !friendMesh.userData.isCustomGLB) {
-                    friendMesh.userData.walkPhase += 0.15;
-                    const s = Math.sin(friendMesh.userData.walkPhase) * 0.45;
-                    friendMesh.userData.legL.rotation.x = s;
-                    friendMesh.userData.legR.rotation.x = -s;
-                }
-            }
-
-            if (!cursorMode && (leftGesture === "POINT" || leftGesture === "VICTORY")) {
-                const spd = (leftGesture === "VICTORY" ? 0.085 : 0.045) * (speedBoost > 0 ? 1.35 : 1.0);
-                playerRig.position.x -= Math.sin(totalYaw) * spd;
-                playerRig.position.z -= Math.cos(totalYaw) * spd;
-            }
-
-            const rPos = new THREE.Vector3(), lPos = new THREE.Vector3();
-            rightHandMesh.getWorldPosition(rPos);
-            leftHandMesh.getWorldPosition(lPos);
-
-            for (let btn of interactiveButtons) {
-                if (btn.cooldown > 0) { btn.cooldown--; continue; }
-                const dist = Math.min(rPos.distanceTo(btn.mesh.position), lPos.distanceTo(btn.mesh.position));
-                if (dist < 0.35 || (cursorMode && rPos.distanceTo(btn.mesh.position) < 3.2 && rightGesture === "POINT")) {
-                    btn.cooldown = 45;
-                    btn.action();
-                }
-            }
-
-            if (rightGesture === "FIST" && !heldItem) {
-                for (let it of worldItems) {
-                    if (!it.taken && playerRig.position.distanceTo(it.mesh.position) < 2.2) {
-                        if (it.type === 'key' && currentState === "LEVEL_0" && activeLevelData.placed < 3) {
-                            setSubtitle("Слишком высоко! Сначала соберите 3 части лестницы под нишей.");
-                            continue;
-                        }
-                        it.taken = true; it.mesh.visible = false;
-                        if (it.type === 'water') {
-                            heldItem = 'water'; beltHasWater = true; beltWater.visible = true;
-                            setSubtitle("Миндальная вода в руке! Поднесите руку близко к камере/рту, чтобы выпить.");
-                        } else if (it.type === 'key' && currentState === "LEVEL_2") {
-                            activeLevelData.keysCollected++;
-                            setSubtitle(`Ключ собран (${activeLevelData.keysCollected}/5)!`);
-                        } else {
-                            heldItem = it.type; beltItem.visible = true;
-                            setSubtitle(it.type === 'ladder' ? "Часть лестницы на поясе! Раскройте ладонь 🖐️ под нишей." : "Ключ на поясе! Подойдите к двери.");
-                        }
-                        break;
-                    }
-                }
-            }
-
-            if ((heldItem === 'water' || beltHasWater) && handNearMouth) {
-                heldItem = null; beltHasWater = false; beltWater.visible = false;
-                sanity = Math.min(100, sanity + 45); speedBoost = 500;
-                setSubtitle("Вы выпили Миндальную воду! Рассудок восстановлен.");
-            }
-
-            if (currentState === "LEVEL_0") {
-                if (rightGesture === "OPEN" && heldItem === 'ladder' && Math.hypot(playerRig.position.x + 3.2, playerRig.position.z + 12.5) < 2.8) {
-                    activeLevelData.steps[activeLevelData.placed].visible = true;
-                    activeLevelData.placed++; heldItem = null; beltItem.visible = false;
-                    setSubtitle(`Ступенька установлена (${activeLevelData.placed}/3)!`);
-                }
-                if (heldItem === 'key' && !activeLevelData.doorOpen && Math.hypot(playerRig.position.x + 1.5, playerRig.position.z + 13.0) < 2.2) {
-                    activeLevelData.doorOpen = true; heldItem = null; beltItem.visible = false;
-                    activeLevelData.door0.visible = false;
-                    setSubtitle("Дверь открыта! Впереди квадратная яма в полу...");
-                }
-                if (!activeLevelData.inPit && activeLevelData.doorOpen && Math.abs(playerRig.position.x) < 1.2 && Math.abs(playerRig.position.z + 18) < 1.2) {
-                    activeLevelData.inPit = true; playerRig.position.y = -2.35; activeLevelData.bac.visible = true;
-                    setSubtitle("ВЫ УПАЛИ В ЯМУ! Бегите по стрелочкам от Бактерии к лестнице и вентиляции!");
-                }
-                if (activeLevelData.inPit) {
-                    const bx = playerRig.position.x - activeLevelData.bac.position.x;
-                    const bz = playerRig.position.z - activeLevelData.bac.position.z;
-                    const d = Math.hypot(bx, bz);
-                    if (d > 0.4) { activeLevelData.bac.position.x += (bx / d) * 0.04; activeLevelData.bac.position.z += (bz / d) * 0.04; }
-                    if (playerRig.position.x > 11.0) loadLevel1();
-                }
-            } else if (currentState === "LEVEL_4" && !activeLevelData.betaFinished) {
-                const lightOn = Math.sin(Date.now() * 0.002) > -0.2;
-                activeLevelData.ceilingLight.intensity = lightOn ? 1.3 : 0.05;
-                if (!lightOn && activeLevelData.gateUnlocked()) {
-                    const sx = playerRig.position.x - activeLevelData.smiler.position.x;
-                    const sz = playerRig.position.z - activeLevelData.smiler.position.z;
-                    const sd = Math.hypot(sx, sz);
-                    if (sd > 0.5) { activeLevelData.smiler.position.x += (sx / sd) * 0.055; activeLevelData.smiler.position.z += (sz / sd) * 0.055; }
-                }
-                if (Math.hypot(playerRig.position.x - 5, playerRig.position.z + 18.5) < 1.5) {
-                    activeLevelData.betaFinished = true;
-                    document.getElementById('beta-end-screen').classList.add('visible');
-                    setTimeout(returnToMenu, 6500);
-                }
-            }
-
-            if (speedBoost > 0) speedBoost--;
-            if (currentState.startsWith("LEVEL_")) sanity = Math.max(0, sanity - 0.006);
-            const ratio = sanity / 100;
-            rHandVis.userData.sanityBar.scale.x = Math.max(0.05, ratio);
-            rHandVis.userData.sanityMat.color.setHex(ratio > 0.5 ? 0x22c55e : (ratio > 0.25 ? 0xeab308 : 0xef4444));
-            document.getElementById('sanity-vignette').style.boxShadow = `inset 0 0 ${Math.floor((1 - ratio) * 130)}px rgba(0,0,0,0.95)`;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            updateWorld();
-            const w = window.innerWidth, h = window.innerHeight;
-            if (isStereo) {
-                const hw = w / 2;
-                camera.aspect = hw / h; camera.updateProjectionMatrix();
-                renderer.setViewport(0, 0, hw, h); renderer.setScissor(0, 0, hw, h);
-                camera.translateX(-0.032); renderer.render(scene, camera); camera.translateX(0.032);
-                renderer.setViewport(hw, 0, hw, h); renderer.setScissor(hw, 0, hw, h);
-                camera.translateX(0.032); renderer.render(scene, camera); camera.translateX(-0.032);
-            } else {
-                camera.aspect = w / h; camera.updateProjectionMatrix();
-                renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h);
-                renderer.render(scene, camera);
-            }
-        }
-        animate();
-    </script>
+    renderer.render(scene, camera);
+}
+(function loop() { requestAnimationFrame(loop); tick(); })();
+</script>
 </body>
 </html>
