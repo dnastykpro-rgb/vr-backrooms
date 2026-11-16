@@ -101,8 +101,8 @@
 
     <video id="cam-video" playsinline autoplay muted></video>
 
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com" onerror="this.onerror=null;this.src='https://jsdelivr.net'"></script>
+    <script src="https://unpkg.com" crossorigin="anonymous"></script>
 
     <script>
         const DB_URL = "https://" + "vrgamep-79dc0-default-rtdb" + ".firebaseio.com";
@@ -330,11 +330,12 @@
         }
 
         async function startHandTracking() {
+            if (typeof Hands !== 'function') return;
             const video = document.getElementById('cam-video');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
                 video.srcObject = stream;
-                const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
+                const hands = new Hands({ locateFile: (f) => `https://unpkg.com{f}` });
                 hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
                 hands.onResults((res) => {
@@ -374,16 +375,16 @@
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
-        let interactiveButtons = []; // 3D-кнопки в мире (меню, лобби, панель лифта, компьютер)
-        let worldItems = [];         // Предметы для сбора в правый кулак (лестница, ключи, вода)
-        let activeLevelData = {};    // Переменные текущего уровня
+        let interactiveButtons = [];
+        let worldItems = [];
+        let activeLevelData = {};
 
         function setSubtitle(text) {
             document.getElementById('subtitle-box').innerText = text;
         }
 
         function clearWorld() {
-            while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children[0]);
+            while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children.at(0));
             interactiveButtons = [];
             worldItems = [];
             activeLevelData = {};
@@ -408,7 +409,6 @@
             return m;
         }
 
-        // 1. 3D VR-МЕНЮ В ЖЁЛТОМ ЛАБИРИНТЕ
         function loadMenuScene() {
             clearWorld();
             currentState = "MENU";
@@ -429,14 +429,12 @@
             light.position.set(0, 2.8, 1);
             worldGroup.add(light);
 
-            // Объёмная 3D-кнопка "ИГРАТЬ" прямо перед игроком
             create3DButton(0, 1.55, 0.8, 1.3, 0.55, "ИГРАТЬ", "#eab308", "#090804", () => {
                 loadLobbyScene();
             });
             setSubtitle("Коснитесь рукой 3D-кнопки «ИГРАТЬ» перед вами");
         }
 
-        // 2. КОМНАТА-ЛОББИ (Одиночная / С другом по коду / Слоты сохранений)
         function loadLobbyScene() {
             clearWorld();
             currentState = "LOBBY";
@@ -451,7 +449,6 @@
             buildWall(6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
             worldGroup.add(new THREE.PointLight(0xfef08a, 1.2, 18));
 
-            // Выбор режима: Одиночная или С другом
             create3DButton(-1.5, 2.1, -1.5, 1.8, 0.55, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
                 isCoop = false;
                 document.getElementById('coop-bar').style.display = 'none';
@@ -467,7 +464,6 @@
                 setSubtitle(`Комната создана! Код для друга: ${roomCode}. Выберите уровень.`);
             });
 
-            // Слоты сохранений (Уровни 0 - 4)
             const levels = [
                 { id: 0, name: "УР.0: ЛОББИ", fn: loadLevel0 },
                 { id: 1, name: "УР.1: МАШИНЫ", fn: loadLevel1 },
@@ -640,7 +636,7 @@
             buildWall(0, 3.4, -5, 24, 0.2, 32, cMat);
             worldGroup.add(new THREE.PointLight(0xe2e8f0, 0.85, 30));
 
-            const keySpots = [[-7, 4],, [-7, -4], [7, -4], [-7, -11]];
+            const keySpots = [[-7, 4], [7, 4], [-7, -4], [7, -4], [-7, -11]];
             keySpots.forEach(([kx, kz]) => {
                 buildWall(kx, 1.6, kz - 2.2, 5, 3.2, 0.3, cMat);
                 buildWall(kx, 1.6, kz + 2.2, 5, 3.2, 0.3, cMat);
@@ -762,18 +758,22 @@
             loadMenuScene();
         }
 
-        async function bootVR(stereoMode) {
+        function bootVR(stereoMode) {
             isStereo = stereoMode;
             document.getElementById('vr-divider').style.display = stereoMode ? 'block' : 'none';
             document.getElementById('boot-overlay').classList.add('hidden');
             document.getElementById('hud').style.display = 'block';
 
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
+                DeviceOrientationEvent.requestPermission().catch(() => {});
             }
-            await startHandTracking();
+
             isBooted = true;
             loadMenuScene();
+
+            if (typeof startHandTracking === 'function') {
+                startHandTracking().catch(() => {});
+            }
         }
 
         function updateWorld() {
