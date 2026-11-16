@@ -13,7 +13,7 @@
             position: fixed; inset: 0; z-index: 100;
             background: radial-gradient(circle at center, #29220a 0%, #090804 100%);
             display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.4s ease;
         }
         #boot-overlay.hidden { opacity: 0; pointer-events: none; }
         #boot-overlay h1 { color: #facc15; font-size: 26px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; text-align: center; }
@@ -70,7 +70,7 @@
 
     <div id="boot-overlay">
         <h1>VR Escape The Backrooms</h1>
-        <p>Нажмите кнопку ниже, чтобы войти в жёлтый лабиринт, включить гироскоп и камеру рук</p>
+        <p>Автономный VR-движок: запускается мгновенно без внешних библиотек</p>
         <div class="btn-group">
             <button class="vr-start-btn" onclick="bootVR(true)">ВОЙТИ В VR (CARDBOARD)</button>
             <button class="vr-start-btn alt" onclick="bootVR(false)">ОБЫЧНЫЙ ЭКРАН (ТЕСТ)</button>
@@ -91,7 +91,7 @@
             <input type="text" id="join-code-input" placeholder="Код друга" maxlength="4">
             <button class="hud-btn" onclick="joinFriendRoom()">Войти</button>
         </div>
-        <div id="subtitle-box">Протяните руку к кнопке «ИГРАТЬ» перед вами</div>
+        <div id="subtitle-box">Нажмите или коснитесь рукой кнопки «ИГРАТЬ» перед вами</div>
     </div>
 
     <div id="beta-end-screen">
@@ -100,187 +100,190 @@
     </div>
 
     <video id="cam-video" playsinline autoplay muted></video>
-
-    <script src="./three.min.js"></script>
-    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
+    <canvas id="glCanvas"></canvas>
 
     <script>
         const DB_URL = "https://" + "vrgamep-79dc0-default-rtdb" + ".firebaseio.com";
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+        let W, H;
+        function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
 
-        let isStereo = false, isBooted = false;
-        let currentState = "MENU";
-        let isCoop = false, roomCode = "", myPlayerId = "p_" + Math.floor(1000 + Math.random() * 9000);
-        let maxUnlockedLevel = parseInt(localStorage.getItem('backrooms_vr_save') || "0");
+        const vs = `
+            attribute vec3 aPos, aNorm; attribute vec2 aUV;
+            uniform mat4 uProj, uView, uModel; uniform vec2 uUVScale;
+            varying vec3 vNorm; varying vec2 vUV; varying float vDist;
+            void main() {
+                vec4 wp = uModel * vec4(aPos, 1.0);
+                vec4 vp = uView * wp;
+                gl_Position = uProj * vp;
+                vNorm = mat3(uModel) * aNorm;
+                vUV = aUV * uUVScale;
+                vDist = -vp.z;
+            }
+        `;
+        const fs = `
+            precision mediump float;
+            varying vec3 vNorm; varying vec2 vUV; varying float vDist;
+            uniform sampler2D uTex; uniform vec3 uTint; uniform vec3 uFogCol; uniform float uFogDen;
+            void main() {
+                vec3 sun = normalize(vec3(0.3, 0.9, 0.2));
+                float l = max(dot(normalize(vNorm), sun), 0.0) * 0.4 + 0.7;
+                vec3 col = texture2D(uTex, vUV).rgb * uTint * l;
+                float f = clamp(exp(-uFogDen * max(0.0, vDist)), 0.0, 1.0);
+                gl_FragColor = vec4(mix(uFogCol, col, f), 1.0);
+            }
+        `;
+        function mkSh(t, s) { const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); return sh; }
+        const prog = gl.createProgram();
+        gl.attachShader(prog, mkSh(gl.VERTEX_SHADER, vs));
+        gl.attachShader(prog, mkSh(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(prog); gl.useProgram(prog); gl.enable(gl.DEPTH_TEST); gl.enable(gl.SCISSOR_TEST);
 
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x141106);
-        scene.fog = new THREE.FogExp2(0x181408, 0.042);
+        const boxVerts = new Float32Array([
+            -0.5,-0.5,0.5,0,0,1,0,1, 0.5,-0.5,0.5,0,0,1,1,1, 0.5,0.5,0.5,0,0,1,1,0, -0.5,-0.5,0.5,0,0,1,0,1, 0.5,0.5,0.5,0,0,1,1,0, -0.5,0.5,0.5,0,0,1,0,0,
+            0.5,-0.5,-0.5,0,0,-1,0,1, -0.5,-0.5,-0.5,0,0,-1,1,1, -0.5,0.5,-0.5,0,0,-1,1,0, 0.5,-0.5,-0.5,0,0,-1,0,1, -0.5,0.5,-0.5,0,0,-1,1,0, 0.5,0.5,-0.5,0,0,-1,0,0,
+            -0.5,0.5,0.5,0,1,0,0,1, 0.5,0.5,0.5,0,1,0,1,1, 0.5,0.5,-0.5,0,1,0,1,0, -0.5,0.5,0.5,0,1,0,0,1, 0.5,0.5,-0.5,0,1,0,1,0, -0.5,0.5,-0.5,0,1,0,0,0,
+            -0.5,-0.5,-0.5,0,-1,0,0,1, 0.5,-0.5,-0.5,0,-1,0,1,1, 0.5,-0.5,0.5,0,-1,0,1,0, -0.5,-0.5,-0.5,0,-1,0,0,1, 0.5,-0.5,0.5,0,-1,0,1,0, -0.5,-0.5,0.5,0,-1,0,0,0,
+            0.5,-0.5,0.5,1,0,0,0,1, 0.5,-0.5,-0.5,1,0,0,1,1, 0.5,0.5,-0.5,1,0,0,1,0, 0.5,-0.5,0.5,1,0,0,0,1, 0.5,0.5,-0.5,1,0,0,1,0, 0.5,0.5,0.5,1,0,0,0,0,
+            -0.5,-0.5,-0.5,-1,0,0,0,1, -0.5,-0.5,0.5,-1,0,0,1,1, -0.5,0.5,0.5,-1,0,0,1,0, -0.5,-0.5,-0.5,-1,0,0,0,1, -0.5,0.5,0.5,-1,0,0,1,0, -0.5,0.5,-0.5,-1,0,0,0,0
+        ]);
+        const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, boxVerts, gl.STATIC_DRAW);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 120);
-        const playerRig = new THREE.Group();
-        playerRig.position.set(0, 1.65, 0);
-        playerRig.add(camera);
-        scene.add(playerRig);
+        const aPos = gl.getAttribLocation(prog, 'aPos'), aNorm = gl.getAttribLocation(prog, 'aNorm'), aUV = gl.getAttribLocation(prog, 'aUV');
+        gl.enableVertexAttribArray(aPos); gl.enableVertexAttribArray(aNorm); gl.enableVertexAttribArray(aUV);
+        gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 32, 0);
+        gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 32, 12);
+        gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 32, 24);
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setScissorTest(true);
-        document.body.appendChild(renderer.domElement);
-
-        window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight));
-        function makeTex(type, labelText = "", bgHex = "#eab308", fgHex = "#090804") {
-            const c = document.createElement('canvas');
-            c.width = 256; c.height = 256;
+        const uProj = gl.getUniformLocation(prog, 'uProj'), uView = gl.getUniformLocation(prog, 'uView'), uModel = gl.getUniformLocation(prog, 'uModel');
+        const uUVScale = gl.getUniformLocation(prog, 'uUVScale'), uTint = gl.getUniformLocation(prog, 'uTint');
+        const uFogCol = gl.getUniformLocation(prog, 'uFogCol'), uFogDen = gl.getUniformLocation(prog, 'uFogDen');
+        function makeTex(type, label = "", bg = "#eab308", fg = "#090804") {
+            const c = document.createElement('canvas'); c.width = 256; c.height = 256;
             const g = c.getContext('2d');
-
-            if (type === 'wallpaper') {
-                g.fillStyle = '#c8b458'; g.fillRect(0, 0, 256, 256);
-                g.fillStyle = '#b5a044';
+            if (type === 'wall') {
+                g.fillStyle = '#d4be59'; g.fillRect(0, 0, 256, 256);
+                g.fillStyle = '#bda642';
                 for (let x = 0; x < 256; x += 32) {
                     g.fillRect(x, 0, 6, 256);
                     for (let y = 0; y < 256; y += 32) g.fillRect(x + 12, y + 8, 8, 14);
                 }
-                g.fillStyle = 'rgba(30,20,5,0.2)'; g.fillRect(0, 236, 256, 20);
-            } else if (type === 'carpet') {
-                g.fillStyle = '#8c7a38'; g.fillRect(0, 0, 256, 256);
-                for (let i = 0; i < 1200; i++) {
-                    g.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.12)' : 'rgba(255,240,180,0.08)';
-                    g.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
+                g.fillStyle = '#5c4d1c'; g.fillRect(0, 236, 256, 20);
+            } else if (type === 'floor') {
+                g.fillStyle = '#8f7d38'; g.fillRect(0, 0, 256, 256);
+                for (let i = 0; i < 900; i++) {
+                    g.fillStyle = i % 2 === 0 ? 'rgba(0,0,0,0.12)' : 'rgba(255,245,180,0.08)';
+                    g.fillRect(Math.random() * 256, Math.random() * 256, 4, 4);
                 }
             } else if (type === 'concrete') {
                 g.fillStyle = '#475569'; g.fillRect(0, 0, 256, 128);
                 g.fillStyle = '#94a3b8'; g.fillRect(0, 128, 256, 128);
-                g.fillStyle = '#1e293b'; g.fillRect(0, 124, 256, 8);
-            } else if (type === 'tile') {
-                g.fillStyle = '#cbd5e1'; g.fillRect(0, 0, 256, 256);
-                g.strokeStyle = '#94a3b8'; g.lineWidth = 3;
-                for (let i = 0; i <= 256; i += 64) { g.strokeRect(i, 0, 64, 256); g.strokeRect(0, i, 256, 64); }
-            } else if (type === 'gridDoor') {
+            } else if (type === 'grid') {
                 g.fillStyle = '#e2e8f0'; g.fillRect(0, 0, 256, 256);
                 g.fillStyle = '#0f172a'; g.fillRect(24, 20, 208, 110);
-                g.strokeStyle = '#64748b'; g.lineWidth = 2;
-                for (let x = 24; x <= 232; x += 14) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 130); g.stroke(); }
-                for (let y = 20; y <= 130; y += 14) { g.beginPath(); g.moveTo(24, y); g.lineTo(232, y); g.stroke(); }
+                g.strokeStyle = '#64748b'; g.lineWidth = 3;
+                for (let x = 24; x <= 232; x += 16) { g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 130); g.stroke(); }
+                for (let y = 20; y <= 130; y += 16) { g.beginPath(); g.moveTo(24, y); g.lineTo(232, y); g.stroke(); }
             } else if (type === 'arrow') {
                 g.fillStyle = '#262626'; g.fillRect(0, 0, 256, 256);
-                g.fillStyle = '#09090b';
+                g.fillStyle = '#000000';
                 g.beginPath(); g.moveTo(40,110); g.lineTo(150,110); g.lineTo(150,75); g.lineTo(220,128); g.lineTo(150,181); g.lineTo(150,146); g.lineTo(40,146); g.fill();
             } else if (type === 'sign') {
-                g.fillStyle = bgHex; g.fillRect(0, 0, 256, 256);
-                g.strokeStyle = fgHex; g.lineWidth = 10; g.strokeRect(10, 10, 236, 236);
-                g.fillStyle = fgHex; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-                g.fillText(labelText, 128, 128);
+                g.fillStyle = bg; g.fillRect(0, 0, 256, 256);
+                g.strokeStyle = fg; g.lineWidth = 12; g.strokeRect(10, 10, 236, 236);
+                g.fillStyle = fg; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+                g.fillText(label, 128, 128);
+            } else {
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
             }
-
-            const t = new THREE.CanvasTexture(c);
-            t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
+            const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
             return t;
         }
 
-        const texWall = makeTex('wallpaper'), texFloor = makeTex('carpet'), texConcrete = makeTex('concrete');
-        const texTile = makeTex('tile'), texGridDoor = makeTex('gridDoor'), texArrow = makeTex('arrow');
+        const texWall = makeTex('wall'), texFloor = makeTex('floor'), texConcrete = makeTex('concrete');
+        const texGrid = makeTex('grid'), texArrow = makeTex('arrow'), texSolid = makeTex('solid');
 
-        const leftHandMesh = new THREE.Group();
-        const rightHandMesh = new THREE.Group();
-        camera.add(leftHandMesh, rightHandMesh);
-
-        function buildHazmatHand(isRight) {
-            const grp = new THREE.Group();
-            const sleeveMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.6 });
-            const gloveMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 });
-
-            const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.055, 0.32, 12), sleeveMat);
-            forearm.rotation.x = Math.PI / 2; forearm.position.set(0, -0.02, 0.22);
-
-            const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.032, 0.10), gloveMat);
-            const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.08, 8), gloveMat);
-            finger.rotation.x = Math.PI / 2; finger.position.set(isRight ? -0.025 : 0.025, 0, -0.07);
-
-            if (isRight) {
-                const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 3.0, 6), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-                laser.rotation.x = Math.PI / 2; laser.position.set(-0.025, 0, -1.55);
-                laser.visible = false;
-                grp.add(laser);
-                grp.userData.laser = laser;
-
-                const band = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14), new THREE.MeshStandardMaterial({ color: 0x09090b }));
-                band.rotation.x = Math.PI / 2; band.position.set(0, -0.015, 0.10);
-                const barMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
-                const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.025), barMat);
-                bar.position.set(0, 0.03, 0.10);
-                grp.add(band, bar);
-                grp.userData.sanityBar = bar;
-                grp.userData.sanityMat = barMat;
-            }
-            grp.add(forearm, palm, finger);
-            grp.userData.finger = finger;
-            return grp;
+        function drawBox(x, y, z, sx, sy, sz, rotY, tex, r, g, b, u = 1, v = 1) {
+            const c = Math.cos(rotY), s = Math.sin(rotY);
+            gl.uniformMatrix4fv(uModel, false, new Float32Array([sx*c,0,-sx*s,0, 0,sy,0,0, sz*s,0,sz*c,0, x,y,z,1]));
+            gl.uniform2f(uUVScale, u, v);
+            gl.uniform3f(uTint, r, g, b);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.drawArrays(gl.TRIANGLES, 0, 36);
         }
 
-        const lHandVis = buildHazmatHand(false), rHandVis = buildHazmatHand(true);
-        leftHandMesh.add(lHandVis); rightHandMesh.add(rHandVis);
-        leftHandMesh.position.set(-0.25, -0.22, -0.45);
-        rightHandMesh.position.set(0.25, -0.22, -0.45);
+        function setCamView(eyeX, eyeY, eyeZ, yaw, pitch, roll, aspect) {
+            const f = 1.0 / Math.tan(0.65), near = 0.1, far = 120;
+            gl.uniformMatrix4fv(uProj, false, new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)/(near-far),-1, 0,0,(2*far*near)/(near-far),0]));
 
-        const beltGroup = new THREE.Group();
-        beltGroup.position.set(0, -0.75, 0);
-        playerRig.add(beltGroup);
-        const beltRing = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.025, 8, 24), new THREE.MeshStandardMaterial({ color: 0x111113 }));
-        beltRing.rotation.x = Math.PI / 2;
-        const beltWater = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
-        beltWater.position.set(-0.26, -0.05, -0.08); beltWater.visible = false;
-        const beltItem = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.07), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
-        beltItem.position.set(0.26, -0.06, -0.08); beltItem.visible = false;
-        beltGroup.add(beltRing, beltWater, beltItem);
-        function createHazmatFriendModel() {
-            const root = new THREE.Group();
-            const suitMat = new THREE.MeshStandardMaterial({ color: 0xd9c836, roughness: 0.65 });
-            const blackMat = new THREE.MeshStandardMaterial({ color: 0x111113, roughness: 0.4 });
-            const glassMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.1 });
+            const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            const cp = Math.cos(pitch), sp = Math.sin(pitch);
+            const fx = -sy * cp, fy = sp, fz = -cy * cp;
+            const rx = cy, rz = -sy;
+            const ux = sy * sp, uy = cp, uz = cy * sp;
 
-            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.21, 0.62, 12), suitMat);
-            torso.position.y = 1.22;
-            const bioSign = new THREE.Mesh(new THREE.RingGeometry(0.04, 0.08, 12), blackMat);
-            bioSign.position.set(0, 1.32, 0.225);
-
-            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 12), blackMat);
-            belt.position.y = 0.92;
-            const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.14, 0.08), blackMat);
-            pouch.position.set(0.22, 0.90, 0.06);
-
-            const hood = new THREE.Mesh(new THREE.SphereGeometry(0.165, 14, 14), suitMat);
-            hood.position.set(0, 1.70, -0.01);
-            const mask = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 12), blackMat);
-            mask.position.set(0, 1.68, 0.04);
-            const eyeL = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.02, 10), glassMat);
-            eyeL.rotation.x = Math.PI / 2; eyeL.position.set(-0.045, 1.71, 0.165);
-            const eyeR = eyeL.clone(); eyeR.position.x = 0.045;
-            const filterL = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10), blackMat);
-            filterL.rotation.x = Math.PI / 2; filterL.position.set(-0.065, 1.63, 0.16);
-            const filterR = filterL.clone(); filterR.position.x = 0.065;
-
-            const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 10), suitMat);
-            armL.position.set(-0.28, 1.22, 0);
-            const gloveL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), blackMat);
-            gloveL.position.set(-0.28, 0.94, 0);
-            const armR = armL.clone(); armR.position.x = 0.28;
-            const gloveR = gloveL.clone(); gloveR.position.x = 0.28;
-
-            const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.085, 0.82, 10), suitMat);
-            legL.position.set(-0.11, 0.45, 0);
-            const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.26), blackMat);
-            bootL.position.set(-0.11, 0.08, 0.04);
-            const legR = legL.clone(); legR.position.x = 0.11;
-            const bootR = bootL.clone(); bootR.position.x = 0.11;
-
-            root.add(torso, bioSign, belt, pouch, hood, mask, eyeL, eyeR, filterL, filterR, armL, gloveL, armR, gloveR, legL, bootL, legR, bootR);
-            root.userData = { legL, legR, armL, armR, targetPos: new THREE.Vector3(), targetYaw: 0, walkPhase: 0 };
-            return root;
+            gl.uniformMatrix4fv(uView, false, new Float32Array([
+                rx, ux, -fx, 0,
+                0,  uy, -fy, 0,
+                rz, uz, -fz, 0,
+                -(rx*eyeX + rz*eyeZ), -(ux*eyeX + uy*eyeY + uz*eyeZ), (fx*eyeX + fy*eyeY + fz*eyeZ), 1
+            ]));
         }
 
-        const friendMesh = createHazmatFriendModel();
-        friendMesh.visible = false;
-        scene.add(friendMesh);
+        function drawHandsAndBelt(px, py, pz, yaw, pitch, sanityVal, hasWater, hasItem, cursorOn) {
+            const c = Math.cos(yaw), s = Math.sin(yaw);
+            const putLocal = (lx, ly, lz, sx, sy, sz, r, g, b) => {
+                const wx = px + lx * c + lz * s;
+                const wy = py + ly + Math.sin(pitch) * (-lz);
+                const wz = pz - lx * s + lz * c;
+                drawBox(wx, wy, wz, sx, sy, sz, yaw, texSolid, r, g, b);
+            };
+
+            putLocal(leftHand.x, leftHand.y, leftHand.z + 0.16, 0.08, 0.08, 0.28, 0.85, 0.78, 0.22);
+            putLocal(leftHand.x, leftHand.y, leftHand.z, 0.09, 0.04, 0.11, 0.1, 0.1, 0.12);
+
+            putLocal(rightHand.x, rightHand.y, rightHand.z + 0.16, 0.08, 0.08, 0.28, 0.85, 0.78, 0.22);
+            putLocal(rightHand.x, rightHand.y, rightHand.z, 0.09, 0.04, 0.11, 0.1, 0.1, 0.12);
+
+            const sRatio = Math.max(0.05, sanityVal / 100);
+            const sr = sRatio > 0.5 ? 0.15 : 0.95;
+            const sg = sRatio > 0.25 ? 0.85 : 0.15;
+            putLocal(rightHand.x, rightHand.y + 0.045, rightHand.z + 0.10, 0.07 * sRatio, 0.018, 0.03, sr, sg, 0.15);
+
+            if (cursorOn) putLocal(rightHand.x, rightHand.y, rightHand.z - 1.5, 0.01, 0.01, 2.8, 0.95, 0.15, 0.15);
+            if (hasWater) putLocal(-0.26, -0.72, -0.05, 0.07, 0.16, 0.07, 0.22, 0.74, 0.97);
+            if (hasItem) putLocal(0.26, -0.72, -0.05, 0.08, 0.26, 0.08, 0.98, 0.80, 0.08);
+        }
+
+        function drawFriendHazmat(fx, fy, fz, fyaw, walk) {
+            const swing = Math.sin(walk) * 0.15;
+            drawBox(fx, fy + 1.22, fz, 0.44, 0.62, 0.26, fyaw, texSolid, 0.85, 0.78, 0.22);
+            drawBox(fx, fy + 1.70, fz, 0.28, 0.30, 0.28, fyaw, texSolid, 0.85, 0.78, 0.22);
+            drawBox(fx, fy + 1.68, fz, 0.22, 0.22, 0.29, fyaw, texSolid, 0.1, 0.1, 0.12);
+            drawBox(fx, fy + 0.92, fz, 0.46, 0.08, 0.28, fyaw, texSolid, 0.1, 0.1, 0.12);
+            drawBox(fx - 0.11, fy + 0.45, fz + swing, 0.16, 0.82, 0.16, fyaw, texSolid, 0.85, 0.78, 0.22);
+            drawBox(fx + 0.11, fy + 0.45, fz - swing, 0.16, 0.82, 0.16, fyaw, texSolid, 0.85, 0.78, 0.22);
+        }
+        let isStereo = false, isBooted = false, currentState = "MENU";
+        let isCoop = false, roomCode = "", myPlayerId = "p_" + Math.floor(1000 + Math.random() * 9000);
+        let maxUnlockedLevel = parseInt(localStorage.getItem('backrooms_vr_save') || "0");
+
+        const player = { x: 0, y: 1.65, z: 2.5 };
+        const leftHand = { x: -0.25, y: -0.22, z: -0.45 };
+        const rightHand = { x: 0.25, y: -0.22, z: -0.45 };
+        const friend = { visible: false, x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0, yaw: 0, tyaw: 0, walking: false, walk: 0 };
+
+        let leftGesture = "NONE", rightGesture = "NONE", cursorMode = false, lastThumbTime = 0, handNearMouth = false;
+        let gyroYaw = 0, gyroPitch = 0, gyroRoll = 0, yawOffset = 0;
+
+        function setSubtitle(t) { document.getElementById('subtitle-box').innerText = t; }
 
         let eventSource = null;
         function connectToRoomStream(code) {
@@ -288,17 +291,16 @@
             eventSource = new EventSource(`${DB_URL}/rooms/${code}/players.json`);
             const applyData = (data) => {
                 if (!data) return;
-                for (let [pid, pdata] of Object.entries(data)) {
-                    if (pid !== myPlayerId && pdata && pdata.x !== undefined) {
-                        friendMesh.visible = true;
-                        friendMesh.userData.targetPos.set(pdata.x, pdata.y, pdata.z);
-                        friendMesh.userData.targetYaw = pdata.yaw || 0;
-                        friendMesh.userData.isWalking = pdata.walking || false;
+                for (let [pid, pd] of Object.entries(data)) {
+                    if (pid !== myPlayerId && pd && pd.x !== undefined) {
+                        friend.visible = true;
+                        friend.tx = pd.x; friend.ty = pd.y; friend.tz = pd.z;
+                        friend.tyaw = pd.yaw || 0; friend.walking = pd.walking || false;
                     }
                 }
             };
-            eventSource.addEventListener('put', (e) => { const msg = JSON.parse(e.data); if (msg && msg.data) applyData(msg.data); });
-            eventSource.addEventListener('patch', (e) => { const msg = JSON.parse(e.data); if (msg && msg.data) applyData(msg.data); });
+            eventSource.addEventListener('put', (e) => { const m = JSON.parse(e.data); if (m && m.data) applyData(m.data); });
+            eventSource.addEventListener('patch', (e) => { const m = JSON.parse(e.data); if (m && m.data) applyData(m.data); });
         }
 
         setInterval(() => {
@@ -306,21 +308,16 @@
             fetch(`${DB_URL}/rooms/${roomCode}/players/${myPlayerId}.json`, {
                 method: 'PUT',
                 body: JSON.stringify({
-                    x: playerRig.position.x, y: playerRig.position.y - 1.65, z: playerRig.position.z,
-                    yaw: gyroYaw + yawOffset, walking: (leftGesture === "POINT" || leftGesture === "VICTORY"), level: currentState
+                    x: player.x, y: player.y - 1.65, z: player.z,
+                    yaw: gyroYaw + yawOffset, walking: (leftGesture === "POINT" || leftGesture === "VICTORY")
                 })
             }).catch(() => {});
         }, 120);
 
-        let leftGesture = "NONE", rightGesture = "NONE", cursorMode = false, lastThumbTime = 0, handNearMouth = false;
-
         function classifyHand(lm) {
             const thumbUp = lm.at(4).y < lm.at(3).y && lm.at(8).y > lm.at(6).y && lm.at(12).y > lm.at(10).y;
-            const iOpen = lm.at(8).y < lm.at(6).y;
-            const mOpen = lm.at(12).y < lm.at(10).y;
-            const rOpen = lm.at(16).y < lm.at(14).y;
-            const pOpen = lm.at(20).y < lm.at(18).y;
-
+            const iOpen = lm.at(8).y < lm.at(6).y, mOpen = lm.at(12).y < lm.at(10).y;
+            const rOpen = lm.at(16).y < lm.at(14).y, pOpen = lm.at(20).y < lm.at(18).y;
             if (thumbUp && !iOpen && !mOpen) return "THUMB";
             if (!iOpen && !mOpen && !rOpen && !pOpen) return "FIST";
             if (iOpen && !mOpen && !rOpen && !pOpen) return "POINT";
@@ -330,132 +327,120 @@
         }
 
         async function startHandTracking() {
-            if (typeof Hands !== 'function') return;
-            const video = document.getElementById('cam-video');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
-                video.srcObject = stream;
-                const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
-                hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-
-                hands.onResults((res) => {
-                    leftGesture = "NONE"; rightGesture = "NONE"; handNearMouth = false;
-                    if (res.multiHandLandmarks && res.multiHandedness) {
-                        for (let i = 0; i < res.multiHandLandmarks.length; i++) {
-                            const lm = res.multiHandLandmarks[i];
-                            const side = res.multiHandedness[i].label;
-                            const gest = classifyHand(lm);
-                            const hx = (0.5 - lm.at(9).x) * 0.95;
-                            const hy = (0.5 - lm.at(9).y) * 0.75 - 0.15;
-                            const size = Math.hypot(lm.at(0).x - lm.at(9).x, lm.at(0).y - lm.at(9).y);
-
-                            if (side === "Left") {
-                                leftGesture = gest;
-                                leftHandMesh.position.set(hx, hy, -0.45);
-                                lHandVis.userData.finger.visible = (gest === "POINT" || gest === "VICTORY" || gest === "OPEN");
-                            } else {
-                                rightGesture = gest;
-                                rightHandMesh.position.set(hx, hy, size > 0.34 ? -0.18 : -0.45);
-                                if (size > 0.34) handNearMouth = true;
-
-                                if (gest === "THUMB" && Date.now() - lastThumbTime > 1000) {
-                                    lastThumbTime = Date.now();
-                                    cursorMode = !cursorMode;
-                                    rHandVis.userData.laser.visible = cursorMode;
-                                    setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН: можно идти.");
+            const s = document.createElement('script');
+            s.src = "https://jsdelivr.net";
+            s.crossOrigin = "anonymous";
+            s.onload = async () => {
+                if (typeof Hands !== 'function') return;
+                const video = document.getElementById('cam-video');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: 320, height: 240 } });
+                    video.srcObject = stream;
+                    const hands = new Hands({ locateFile: (f) => `https://jsdelivr.net{f}` });
+                    hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+                    hands.onResults((res) => {
+                        leftGesture = "NONE"; rightGesture = "NONE"; handNearMouth = false;
+                        if (res.multiHandLandmarks && res.multiHandedness) {
+                            for (let i = 0; i < res.multiHandLandmarks.length; i++) {
+                                const lm = res.multiHandLandmarks[i];
+                                const side = res.multiHandedness[i].label;
+                                const gest = classifyHand(lm);
+                                const hx = (0.5 - lm.at(9).x) * 0.9, hy = (0.5 - lm.at(9).y) * 0.7 - 0.15;
+                                const size = Math.hypot(lm.at(0).x - lm.at(9).x, lm.at(0).y - lm.at(9).y);
+                                if (side === "Left") {
+                                    leftGesture = gest; leftHand.x = hx; leftHand.y = hy;
+                                } else {
+                                    rightGesture = gest; rightHand.x = hx; rightHand.y = hy;
+                                    rightHand.z = size > 0.34 ? -0.18 : -0.45;
+                                    if (size > 0.34) handNearMouth = true;
+                                    if (gest === "THUMB" && Date.now() - lastThumbTime > 1000) {
+                                        lastThumbTime = Date.now(); cursorMode = !cursorMode;
+                                        setSubtitle(cursorMode ? "Режим Курсора ВКЛЮЧЁН: наведите палец на кнопку!" : "Режим Курсора ВЫКЛЮЧЕН.");
+                                    }
                                 }
                             }
                         }
-                    }
-                });
-                const pump = async () => { if (video.readyState >= 2) await hands.send({ image: video }); requestAnimationFrame(pump); };
-                pump();
-            } catch (e) {}
+                    });
+                    const pump = async () => { if (video.readyState >= 2) await hands.send({ image: video }); requestAnimationFrame(pump); };
+                    pump();
+                } catch (e) {}
+            };
+            document.body.appendChild(s);
         }
-        const worldGroup = new THREE.Group();
-        scene.add(worldGroup);
-
-        let interactiveButtons = [];
-        let worldItems = [];
-        let activeLevelData = {};
-
-        function setSubtitle(text) {
-            document.getElementById('subtitle-box').innerText = text;
-        }
+        let boxes = [];
+        let buttons = [];
+        let items = [];
+        let levelState = {};
+        let fogColor = [0.09, 0.08, 0.03];
+        let fogDensity = 0.04;
 
         function clearWorld() {
-            while (worldGroup.children.length > 0) worldGroup.remove(worldGroup.children.at(0));
-            interactiveButtons = [];
-            worldItems = [];
-            activeLevelData = {};
-            beltItem.visible = false;
+            boxes = [];
+            buttons = [];
+            items = [];
+            levelState = {};
+            fogColor = [0.09, 0.08, 0.03];
+            fogDensity = 0.04;
         }
 
-        function create3DButton(x, y, z, w, h, label, bgHex, fgHex, onClickAction, rotY = 0) {
-            const mat = new THREE.MeshStandardMaterial({ map: makeTex('sign', label, bgHex, fgHex), roughness: 0.4 });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.12), mat);
-            mesh.position.set(x, y, z);
-            mesh.rotation.y = rotY;
-            worldGroup.add(mesh);
-            const btnObj = { mesh, action: onClickAction, cooldown: 0 };
-            interactiveButtons.push(btnObj);
-            return btnObj;
+        function addBox(x, y, z, sx, sy, sz, tex = texWall, r = 1, g = 1, b = 1, u = 1, v = 1, rotY = 0) {
+            const obj = { x, y, z, sx, sy, sz, tex, r, g, b, u, v, rotY, visible: true };
+            boxes.push(obj);
+            return obj;
         }
 
-        function buildWall(x, y, z, w, h, d, mat) {
-            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            m.position.set(x, y, z);
-            worldGroup.add(m);
-            return m;
+        function addBtn(x, y, z, w, h, label, bgHex, fgHex, onClick) {
+            const tex = makeTex('sign', label, bgHex, fgHex);
+            const box = addBox(x, y, z, w, h, 0.12, tex, 1, 1, 1);
+            buttons.push({ box, onClick, cooldown: 0 });
+        }
+
+        function addItem(type, x, y, z, r = 0.6, g = 0.3, b = 0.1) {
+            const sx = type === 'water' ? 0.14 : (type === 'key' ? 0.22 : 0.65);
+            const sy = type === 'water' ? 0.28 : 0.16;
+            const sz = type === 'water' ? 0.14 : 0.16;
+            const box = addBox(x, y, z, sx, sy, sz, texSolid, r, g, b);
+            items.push({ type, box, taken: false });
+            return box;
         }
 
         function loadMenuScene() {
             clearWorld();
             currentState = "MENU";
-            scene.fog = new THREE.FogExp2(0x181408, 0.04);
-            playerRig.position.set(0, 1.65, 2.5);
+            player.x = 0; player.y = 1.65; player.z = 2.6;
             document.getElementById('coop-bar').style.display = 'none';
 
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
-            buildWall(0, -0.1, 0, 16, 0.2, 16, fMat);
-            buildWall(0, 3.3, 0, 16, 0.2, 16, wMat);
-            buildWall(0, 1.6, -4, 16, 3.2, 0.4, wMat);
-            buildWall(0, 1.6, 5, 16, 3.2, 0.4, wMat);
-            buildWall(-5, 1.6, 0, 0.4, 3.2, 16, wMat);
-            buildWall(5, 1.6, 0, 0.4, 3.2, 16, wMat);
+            addBox(0, -0.1, 0, 16, 0.2, 16, texFloor, 1, 1, 1, 8, 8);
+            addBox(0, 3.3, 0, 16, 0.2, 16, texWall, 0.85, 0.85, 0.75, 8, 8);
+            addBox(0, 1.6, -4, 16, 3.2, 0.4, texWall, 1, 1, 1, 5, 1);
+            addBox(0, 1.6, 5, 16, 3.2, 0.4, texWall, 1, 1, 1, 5, 1);
+            addBox(-5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
+            addBox(5, 1.6, 0, 0.4, 3.2, 16, texWall, 1, 1, 1, 5, 1);
 
-            const light = new THREE.PointLight(0xfef08a, 1.2, 15);
-            light.position.set(0, 2.8, 1);
-            worldGroup.add(light);
-
-            create3DButton(0, 1.55, 0.8, 1.3, 0.55, "ИГРАТЬ", "#eab308", "#090804", () => {
+            addBtn(0, 1.55, 0.8, 1.35, 0.55, "ИГРАТЬ", "#eab308", "#090804", () => {
                 loadLobbyScene();
             });
-            setSubtitle("Коснитесь рукой 3D-кнопки «ИГРАТЬ» перед вами");
+            setSubtitle("Коснитесь рукой или нажмите на 3D-кнопку «ИГРАТЬ» перед вами");
         }
 
         function loadLobbyScene() {
             clearWorld();
             currentState = "LOBBY";
-            playerRig.position.set(0, 1.65, 3.2);
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
+            player.x = 0; player.y = 1.65; player.z = 3.2;
 
-            buildWall(0, -0.1, 0, 18, 0.2, 18, fMat);
-            buildWall(0, 3.3, 0, 18, 0.2, 18, wMat);
-            buildWall(0, 1.6, -4.5, 18, 3.2, 0.4, wMat);
-            buildWall(-6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
-            buildWall(6.5, 1.6, 0, 0.4, 3.2, 18, wMat);
-            worldGroup.add(new THREE.PointLight(0xfef08a, 1.2, 18));
+            addBox(0, -0.1, 0, 18, 0.2, 18, texFloor, 1, 1, 1, 9, 9);
+            addBox(0, 3.3, 0, 18, 0.2, 18, texWall, 0.85, 0.85, 0.75, 9, 9);
+            addBox(0, 1.6, -4.5, 18, 3.2, 0.4, texWall, 1, 1, 1, 6, 1);
+            addBox(-6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
+            addBox(6.5, 1.6, 0, 0.4, 3.2, 18, texWall, 1, 1, 1, 6, 1);
 
-            create3DButton(-1.5, 2.1, -1.5, 1.8, 0.55, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
+            addBtn(-1.5, 2.1, -1.5, 1.8, 0.55, "ОДИНОЧНАЯ", "#eab308", "#090804", () => {
                 isCoop = false;
                 document.getElementById('coop-bar').style.display = 'none';
                 setSubtitle("Выбран одиночный режим. Нажмите на сохранение уровня ниже!");
             });
 
-            create3DButton(1.5, 2.1, -1.5, 1.8, 0.55, "С ДРУГОМ (CO-OP)", "#38bdf8", "#090804", () => {
+            addBtn(1.5, 2.1, -1.5, 1.8, 0.55, "С ДРУГОМ (CO-OP)", "#38bdf8", "#090804", () => {
                 isCoop = true;
                 if (!roomCode) roomCode = String(Math.floor(1000 + Math.random() * 9000));
                 document.getElementById('my-room-code').innerText = roomCode;
@@ -465,16 +450,16 @@
             });
 
             const levels = [
-                { id: 0, name: "УР.0: ЛОББИ", fn: loadLevel0 },
-                { id: 1, name: "УР.1: МАШИНЫ", fn: loadLevel1 },
-                { id: 2, name: "УР.2: КОЖЕКРАД", fn: loadLevel2 },
-                { id: 3, name: "УР.3: ТЕМНОТА", fn: loadLevel3 },
-                { id: 4, name: "УР.4: УЛЫБАШКИ", fn: loadLevel4 }
+                { name: "УР.0: ЛОББИ", fn: loadLevel0 },
+                { name: "УР.1: МАШИНЫ", fn: loadLevel1 },
+                { name: "УР.2: КОЖЕКРАД", fn: loadLevel2 },
+                { name: "УР.3: ТЕМНОТА", fn: loadLevel3 },
+                { name: "УР.4: УЛЫБАШКИ", fn: loadLevel4 }
             ];
 
             levels.forEach((lvl, idx) => {
                 const unlocked = idx <= maxUnlockedLevel;
-                create3DButton(-3.2 + idx * 1.6, 1.15, -1.5, 1.4, 0.5, unlocked ? lvl.name : "ЗАКРЫТО", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
+                addBtn(-3.2 + idx * 1.6, 1.15, -1.5, 1.4, 0.5, unlocked ? lvl.name : "ЗАКРЫТО", unlocked ? "#22c55e" : "#44403c", "#ffffff", () => {
                     if (unlocked) lvl.fn();
                     else setSubtitle("Сначала пройдите предыдущий уровень!");
                 });
@@ -485,8 +470,7 @@
         function joinFriendRoom() {
             const code = document.getElementById('join-code-input').value.trim();
             if (code.length === 4) {
-                isCoop = true;
-                roomCode = code;
+                isCoop = true; roomCode = code;
                 document.getElementById('my-room-code').innerText = roomCode;
                 connectToRoomStream(roomCode);
                 setSubtitle(`Вы подключились к комнате друга: ${roomCode}!`);
@@ -499,69 +483,54 @@
             }
         }
 
-        function spawnWorldItem(type, x, y, z, colorHex = 0x92400e) {
-            let mesh;
-            if (type === 'water') mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.24, 10), new THREE.MeshStandardMaterial({ color: 0x38bdf8 }));
-            else if (type === 'key') mesh = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 8, 14), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
-            else mesh = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.14, 0.14), new THREE.MeshStandardMaterial({ color: colorHex }));
-            mesh.position.set(x, y, z);
-            worldGroup.add(mesh);
-            worldItems.push({ type, mesh, taken: false });
-            return mesh;
-        }
-
         function loadLevel0() {
             clearWorld();
             currentState = "LEVEL_0";
-            playerRig.position.set(0, 1.65, 0);
-            const wMat = new THREE.MeshStandardMaterial({ map: texWall });
-            const fMat = new THREE.MeshStandardMaterial({ map: texFloor });
-            const aMat = new THREE.MeshStandardMaterial({ map: texArrow });
+            player.x = 0; player.y = 1.65; player.z = 0;
 
-            buildWall(0, -0.1, -5, 26, 0.2, 18, fMat);
-            buildWall(-6, -0.1, -18, 10, 0.2, 8, fMat);
-            buildWall(6, -0.1, -18, 10, 0.2, 8, fMat);
-            buildWall(0, -0.1, -15, 2, 0.2, 2, fMat);
-            buildWall(0, -0.1, -21, 2, 0.2, 2, fMat);
-            buildWall(0, 3.3, -10, 32, 0.2, 32, wMat);
+            addBox(0, -0.1, -5, 26, 0.2, 18, texFloor, 1, 1, 1, 12, 8);
+            addBox(-6, -0.1, -18, 10, 0.2, 8, texFloor, 1, 1, 1, 5, 4);
+            addBox(6, -0.1, -18, 10, 0.2, 8, texFloor, 1, 1, 1, 5, 4);
+            addBox(0, -0.1, -15, 2, 0.2, 2, texFloor, 1, 1, 1, 1, 1);
+            addBox(0, -0.1, -21, 2, 0.2, 2, texFloor, 1, 1, 1, 1, 1);
+            addBox(0, 3.3, -10, 32, 0.2, 32, texWall, 0.85, 0.85, 0.75, 16, 16);
 
-            buildWall(0, 1.6, 3.5, 22, 3.2, 0.4, wMat);
-            buildWall(-11, 1.6, -9, 0.4, 3.2, 26, wMat);
-            buildWall(11, 1.6, -9, 0.4, 3.2, 26, wMat);
-            buildWall(-4, 1.6, -4, 0.4, 3.2, 8, wMat);
-            buildWall(4, 1.6, -5, 0.4, 3.2, 7, wMat);
+            addBox(0, 1.6, 3.5, 22, 3.2, 0.4, texWall, 1, 1, 1, 7, 1);
+            addBox(-11, 1.6, -9, 0.4, 3.2, 26, texWall, 1, 1, 1, 8, 1);
+            addBox(11, 1.6, -9, 0.4, 3.2, 26, texWall, 1, 1, 1, 8, 1);
+            addBox(-4, 1.6, -4, 0.4, 3.2, 8, texWall, 1, 1, 1, 3, 1);
+            addBox(4, 1.6, -5, 0.4, 3.2, 7, texWall, 1, 1, 1, 3, 1);
 
-            buildWall(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, wMat);
-            buildWall(-3.2, 1.0, -13.5, 2.0, 2.0, 0.5, wMat);
-            buildWall(-3.2, 2.9, -13.5, 2.0, 0.6, 0.5, wMat);
-            buildWall(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, new THREE.MeshStandardMaterial({ color: 0x09090b }));
-            buildWall(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, wMat);
+            addBox(-7.5, 1.6, -13.5, 6.5, 3.2, 0.5, texWall, 1, 1, 1, 2, 1);
+            addBox(-3.2, 1.0, -13.5, 2.0, 2.0, 0.5, texWall, 1, 1, 1, 1, 1);
+            addBox(-3.2, 2.9, -13.5, 2.0, 0.6, 0.5, texWall, 1, 1, 1, 1, 1);
+            addBox(-3.2, 2.3, -13.7, 1.2, 0.6, 0.1, texSolid, 0.05, 0.05, 0.05);
+            addBox(3.5, 1.6, -13.5, 13.5, 3.2, 0.5, texWall, 1, 1, 1, 4, 1);
 
-            const door0 = buildWall(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+            const door0 = addBox(-1.5, 1.2, -13.5, 1.4, 2.4, 0.18, texSolid, 0.35, 0.15, 0.04);
             const steps = [];
             for (let i = 0; i < 3; i++) {
-                const s = buildWall(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, new THREE.MeshStandardMaterial({ color: 0x78350f }));
+                const s = addBox(-3.2, 0.38 + i * 0.72, -13.1 + i * 0.12, 0.8, 0.75, 0.15, texSolid, 0.55, 0.25, 0.08);
                 s.visible = false; steps.push(s);
             }
 
-            buildWall(0, -4.2, -18, 28, 0.3, 24, fMat);
-            buildWall(0, -2.6, -14, 26, 3.2, 0.4, wMat);
-            buildWall(0, -2.6, -22, 26, 3.2, 0.4, wMat);
-            buildWall(-3, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
-            buildWall(4, -2.4, -14.25, 1.2, 0.8, 0.05, aMat);
-            buildWall(11.5, -3.2, -18, 2.5, 1.8, 2.5, new THREE.MeshStandardMaterial({ color: 0x57534e }));
+            addBox(0, -4.2, -18, 28, 0.3, 24, texFloor, 0.7, 0.7, 0.7, 12, 10);
+            addBox(0, -2.6, -14, 26, 3.2, 0.4, texWall, 0.8, 0.8, 0.8, 8, 1);
+            addBox(0, -2.6, -22, 26, 3.2, 0.4, texWall, 0.8, 0.8, 0.8, 8, 1);
+            addBox(-3, -2.4, -14.25, 1.2, 0.8, 0.05, texArrow);
+            addBox(4, -2.4, -14.25, 1.2, 0.8, 0.05, texArrow);
+            addBox(11.5, -3.2, -18, 2.5, 1.8, 2.5, texSolid, 0.35, 0.33, 0.3);
 
-            const bac = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x09090b }));
-            bac.position.set(-10, -3.0, -18); bac.visible = false; worldGroup.add(bac);
+            const bac = addBox(-10, -3.0, -18, 0.25, 2.2, 0.25, texSolid, 0.04, 0.04, 0.05);
+            bac.visible = false;
 
-            worldGroup.add(new THREE.PointLight(0xfef08a, 1.1, 25));
-            spawnWorldItem('ladder', -7.5, 0.2, -1.5);
-            spawnWorldItem('ladder', 7.5, 0.2, -8.5);
-            spawnWorldItem('ladder', 1.2, 0.2, -2.0);
-            spawnWorldItem('key', -3.2, 2.25, -13.4);
-            spawnWorldItem('water', -7.0, 0.2, -9.0);
+            addItem('ladder', -7.5, 0.2, -1.5, 0.55, 0.25, 0.08);
+            addItem('ladder', 7.5, 0.2, -8.5, 0.55, 0.25, 0.08);
+            addItem('ladder', 1.2, 0.2, -2.0, 0.55, 0.25, 0.08);
+            addItem('key', -3.2, 2.25, -13.4, 0.98, 0.80, 0.08);
+            addItem('water', -7.0, 0.2, -9.0, 0.22, 0.74, 0.97);
 
-            activeLevelData = { steps, placed: 0, door0, doorOpen: false, inPit: false, bac };
+            levelState = { steps, placed: 0, door0, doorOpen: false, inPit: false, bac };
             setSubtitle("Уровень 0: Соберите 3 части лестницы (кулак ✊) под квадратную дыру в стене");
         }
 
@@ -569,106 +538,96 @@
             unlockLevel(1);
             clearWorld();
             currentState = "LEVEL_1";
-            playerRig.position.set(0, 1.65, 8);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
-            buildWall(0, -0.1, -6, 24, 0.2, 34, new THREE.MeshStandardMaterial({ color: 0x334155 }));
-            buildWall(0, 3.4, -6, 24, 0.2, 34, cMat);
-            buildWall(0, 1.6, 10, 24, 3.2, 0.4, cMat);
-            buildWall(0, 1.6, -22, 24, 3.2, 0.4, cMat);
-            worldGroup.add(new THREE.PointLight(0xe2e8f0, 1.0, 35));
+            player.x = 0; player.y = 1.65; player.z = 8;
+            fogColor = [0.12, 0.14, 0.18];
+
+            addBox(0, -0.1, -6, 24, 0.2, 34, texSolid, 0.22, 0.25, 0.30);
+            addBox(0, 3.4, -6, 24, 0.2, 34, texConcrete, 0.7, 0.7, 0.7, 6, 8);
+            addBox(0, 1.6, 10, 24, 3.2, 0.4, texConcrete, 1, 1, 1, 6, 1);
+            addBox(0, 1.6, -22, 24, 3.2, 0.4, texConcrete, 1, 1, 1, 6, 1);
 
             const colors = [
-                { name: "КРАСНЫЙ", hex: "#ef4444", num: 0xef4444 },
-                { name: "СИНИЙ", hex: "#3b82f6", num: 0x3b82f6 },
-                { name: "ЗЕЛЁНЫЙ", hex: "#22c55e", num: 0x22c55e },
-                { name: "ЖЁЛТЫЙ", hex: "#eab308", num: 0xeab308 }
+                { name: "КРАСНЫЙ", hex: "#ef4444", rgb: [0.93, 0.26, 0.26] },
+                { name: "СИНИЙ", hex: "#3b82f6", rgb: [0.23, 0.51, 0.96] },
+                { name: "ЗЕЛЁНЫЙ", hex: "#22c55e", rgb: [0.13, 0.77, 0.36] },
+                { name: "ЖЁЛТЫЙ", hex: "#eab308", rgb: [0.91, 0.70, 0.03] }
             ].sort(() => Math.random() - 0.5);
 
             const positions = [[-7, 4], [7, 4], [-7, -4], [7, -4], [-7, -12], [7, -12]];
             let carIdx = 0;
             positions.forEach(([bx, bz], i) => {
-                buildWall(bx, 1.6, bz - 2.5, 6, 3.2, 0.3, cMat);
-                buildWall(bx, 1.6, bz + 2.5, 6, 3.2, 0.3, cMat);
+                addBox(bx, 1.6, bz - 2.5, 6, 3.2, 0.3, texConcrete, 1, 1, 1, 2, 1);
+                addBox(bx, 1.6, bz + 2.5, 6, 3.2, 0.3, texConcrete, 1, 1, 1, 2, 1);
                 if (i === 1 || i === 4) {
-                    buildWall(bx, 0.7, bz, 3.6, 1.2, 1.9, new THREE.MeshStandardMaterial({ color: 0x64748b }));
+                    addBox(bx, 0.7, bz, 3.6, 1.2, 1.9, texSolid, 0.45, 0.48, 0.52);
                 } else if (carIdx < 4) {
                     const col = colors[carIdx];
-                    buildWall(bx, 0.65, bz, 3.6, 1.1, 1.8, new THREE.MeshStandardMaterial({ color: col.num }));
-                    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), makeTex('sign', `№${carIdx + 1}`, "#0f172a", col.hex));
-                    sign.position.set(bx > 0 ? bx - 2.8 : bx + 2.8, 1.8, bz);
-                    sign.rotation.y = bx > 0 ? -Math.PI / 2 : Math.PI / 2;
-                    worldGroup.add(sign);
+                    addBox(bx, 0.65, bz, 3.6, 1.1, 1.8, texSolid, col.rgb[0], col.rgb[1], col.rgb[2]);
+                    const signTex = makeTex('sign', `№${carIdx + 1}`, "#0f172a", col.hex);
+                    addBox(bx > 0 ? bx - 2.8 : bx + 2.8, 1.8, bz, 0.1, 1.0, 1.0, signTex, 1, 1, 1);
                     carIdx++;
                 }
             });
 
-            const enteredCode = [];
+            const entered = [];
             colors.forEach((c, idx) => {
-                create3DButton(-1.8 + idx * 1.2, 1.5, -21.6, 1.0, 0.5, c.name, c.hex, "#ffffff", () => {
-                    enteredCode.push(c.name);
-                    setSubtitle(`Введён цвет: ${c.name} (${enteredCode.length}/4)`);
-                    if (enteredCode.length === 4) {
-                        const ok = enteredCode.every((val, k) => val === colors[k].name);
+                addBtn(-1.8 + idx * 1.2, 1.5, -21.6, 1.0, 0.5, c.name, c.hex, "#ffffff", () => {
+                    entered.push(c.name);
+                    setSubtitle(`Введён цвет: ${c.name} (${entered.length}/4)`);
+                    if (entered.length === 4) {
+                        const ok = entered.every((v, k) => v === colors[k].name);
                         if (ok) {
                             setSubtitle("КОД ВЕРНЫЙ! Лифт поднимает вас на Уровень 2 (Кожекрад)...");
                             setTimeout(loadLevel2, 1500);
                         } else {
-                            enteredCode.length = 0;
+                            entered.length = 0;
                             setSubtitle("НЕВЕРНЫЙ КОД! Попробуйте ввести 4 цвета заново.");
                         }
                     }
                 });
             });
 
-            spawnWorldItem('water', 0, 0.2, 0);
+            addItem('water', 0, 0.2, 0, 0.22, 0.74, 0.97);
             setSubtitle("Уровень 1: Найдите 4 открытые машины в комнатах (№1-№4) и введите цвета у лифта (👍 -> ☝️)");
         }
         function loadLevel2() {
             unlockLevel(2);
             clearWorld();
             currentState = "LEVEL_2";
-            playerRig.position.set(0, 1.65, 9);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
-            const gMat = new THREE.MeshStandardMaterial({ map: texGridDoor });
-            const tMat = new THREE.MeshStandardMaterial({ map: texTile });
+            player.x = 0; player.y = 1.65; player.z = 9;
+            fogColor = [0.12, 0.14, 0.18];
 
-            buildWall(0, -0.1, -5, 24, 0.2, 32, new THREE.MeshStandardMaterial({ color: 0x334155 }));
-            buildWall(0, 3.4, -5, 24, 0.2, 32, cMat);
-            worldGroup.add(new THREE.PointLight(0xe2e8f0, 0.85, 30));
+            addBox(0, -0.1, -5, 24, 0.2, 32, texSolid, 0.22, 0.25, 0.30);
+            addBox(0, 3.4, -5, 24, 0.2, 32, texConcrete, 0.7, 0.7, 0.7, 6, 8);
 
             const keySpots = [[-7, 4], [7, 4], [-7, -4], [7, -4], [-7, -11]];
             keySpots.forEach(([kx, kz]) => {
-                buildWall(kx, 1.6, kz - 2.2, 5, 3.2, 0.3, cMat);
-                buildWall(kx, 1.6, kz + 2.2, 5, 3.2, 0.3, cMat);
-                buildWall(kx > 0 ? kx - 2.4 : kx + 2.4, 1.3, kz + 1.2, 0.15, 2.6, 1.4, gMat);
-                spawnWorldItem('key', kx, 0.4, kz);
+                addBox(kx, 1.6, kz - 2.2, 5, 3.2, 0.3, texConcrete, 1, 1, 1, 2, 1);
+                addBox(kx, 1.6, kz + 2.2, 5, 3.2, 0.3, texConcrete, 1, 1, 1, 2, 1);
+                addBox(kx > 0 ? kx - 2.4 : kx + 2.4, 1.3, kz + 1.2, 0.15, 2.6, 1.4, texGrid);
+                addItem('key', kx, 0.4, kz, 0.98, 0.80, 0.08);
             });
 
-            buildWall(0, 0.01, -18, 8, 0.2, 6, tMat);
-            const airlockOuterDoor = buildWall(0, 1.4, -15, 2.0, 2.8, 0.2, gMat);
-            buildWall(0, 1.4, -21, 1.6, 2.6, 0.25, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            let airlockClosed = false;
+            addBox(0, 0.01, -18, 8, 0.2, 6, texSolid, 0.82, 0.85, 0.88);
+            const airlockDoor = addBox(0, 1.4, -15, 2.0, 2.8, 0.2, texGrid);
+            addBox(0, 1.4, -21, 1.6, 2.6, 0.25, texSolid, 0.15, 0.18, 0.22);
 
-            create3DButton(-1.6, 1.5, -15.3, 1.0, 0.45, "ЗАКРЫТЬ ШЛЮЗ", "#ef4444", "#ffffff", () => {
-                airlockClosed = true;
-                airlockOuterDoor.position.x = 0;
+            addBtn(-1.6, 1.5, -15.3, 1.0, 0.45, "ЗАКРЫТЬ ШЛЮЗ", "#ef4444", "#ffffff", () => {
+                airlockDoor.x = 0;
                 setSubtitle("Вход в шлюз закрыт! Кожекрад не достанет.");
             });
 
-            create3DButton(1.4, 1.5, -20.7, 1.2, 0.5, "ГЕРМОДВЕРЬ (5 КЛ.)", "#22c55e", "#ffffff", () => {
-                if (activeLevelData.keysCollected >= 5) {
+            addBtn(1.4, 1.5, -20.7, 1.2, 0.5, "ГЕРМОДВЕРЬ (5 КЛ.)", "#22c55e", "#ffffff", () => {
+                if (levelState.keysCollected >= 5) {
                     setSubtitle("Все 5 замков провернуты! Переход на Тёмную двухэтажную парковку...");
                     setTimeout(loadLevel3, 1500);
                 } else {
-                    setSubtitle(`Нужно 5 ключей из комнат! Собрано: ${activeLevelData.keysCollected}/5`);
+                    setSubtitle(`Нужно 5 ключей из комнат! Собрано: ${levelState.keysCollected}/5`);
                 }
             });
 
-            const skinStealer = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 2.1, 10), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
-            skinStealer.position.set(5, 1.05, -8);
-            worldGroup.add(skinStealer);
-
-            activeLevelData = { keysCollected: 0, skinStealer, airlockClosed: () => airlockClosed };
+            const skinStealer = addBox(5, 1.05, -8, 0.5, 2.1, 0.4, texSolid, 0.65, 0.15, 0.15);
+            levelState = { keysCollected: 0, skinStealer };
             setSubtitle("Уровень 2: Соберите 5 ключей в комнатах с сеткой и укройтесь от Кожекрада в шлюзе!");
         }
 
@@ -676,17 +635,16 @@
             unlockLevel(3);
             clearWorld();
             currentState = "LEVEL_3";
-            playerRig.position.set(0, 1.65, 8);
-            scene.fog = new THREE.FogExp2(0x050507, 0.11);
-            const cMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            player.x = 0; player.y = 1.65; player.z = 8;
+            fogColor = [0.02, 0.02, 0.03];
+            fogDensity = 0.12;
 
-            buildWall(0, -0.1, -6, 22, 0.2, 30, cMat);
-            buildWall(0, 3.2, -6, 22, 0.2, 30, cMat);
-            create3DButton(7.5, 1.5, -18, 1.4, 0.8, "ЛИФТ НАВЕРХ", "#eab308", "#090804", () => {
-                scene.fog = new THREE.FogExp2(0x181408, 0.042);
+            addBox(0, -0.1, -6, 22, 0.2, 30, texSolid, 0.12, 0.14, 0.18);
+            addBox(0, 3.2, -6, 22, 0.2, 30, texSolid, 0.12, 0.14, 0.18);
+            addBtn(7.5, 1.5, -18, 1.4, 0.8, "ЛИФТ НАВЕРХ", "#eab308", "#090804", () => {
                 loadLevel4();
             });
-            spawnWorldItem('water', -4, 0.2, -2);
+            addItem('water', -4, 0.2, -2, 0.22, 0.74, 0.97);
             setSubtitle("Уровень 3: Очень тёмная парковка. Найдите в темноте кнопку лифта наверх!");
         }
 
@@ -694,17 +652,15 @@
             unlockLevel(4);
             clearWorld();
             currentState = "LEVEL_4";
-            playerRig.position.set(0, 1.65, 10);
-            const cMat = new THREE.MeshStandardMaterial({ map: texConcrete });
+            player.x = 0; player.y = 1.65; player.z = 10;
+            fogColor = [0.08, 0.09, 0.12];
+            fogDensity = 0.04;
 
-            buildWall(0, -0.1, -8, 26, 0.2, 38, new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            const ceilingLight = new THREE.PointLight(0xffffff, 1.1, 40);
-            ceilingLight.position.set(0, 3.1, -8);
-            worldGroup.add(ceilingLight);
-
-            const gate = buildWall(0, 1.6, 4, 8, 3.2, 0.3, new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            addBox(0, -0.1, -8, 26, 0.2, 38, texSolid, 0.15, 0.17, 0.20);
+            const gate = addBox(0, 1.6, 4, 8, 3.2, 0.3, texSolid, 0.35, 0.38, 0.42);
             let gateUnlocked = false;
-            create3DButton(-7.5, 1.5, 6, 1.4, 0.6, "ПК: ОТКРЫТЬ ВОРОТА", "#38bdf8", "#090804", () => {
+
+            addBtn(-7.5, 1.5, 6, 1.4, 0.6, "ПК: ОТКРЫТЬ ВОРОТА", "#38bdf8", "#090804", () => {
                 gateUnlocked = true;
                 gate.visible = false;
                 setSubtitle("Доступ разрешён! Ворота открыты. Осторожно: в зале мигает свет и бегают Улыбашки!");
@@ -712,30 +668,27 @@
 
             for (let i = 1; i <= 5; i++) {
                 const colZ = 1 - i * 4.2;
-                buildWall(-3.5, 1.6, colZ, 1.4, 3.2, 1.4, cMat);
-                const numSign = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), makeTex('sign', String(i), "#334155", "#ffffff"));
-                numSign.position.set(-3.5, 2.0, colZ + 0.72);
-                worldGroup.add(numSign);
+                addBox(-3.5, 1.6, colZ, 1.4, 3.2, 1.4, texConcrete, 1, 1, 1);
+                const numTex = makeTex('sign', String(i), "#334155", "#ffffff");
+                addBox(-3.5, 2.0, colZ + 0.72, 1.1, 1.1, 0.06, numTex, 1, 1, 1);
             }
 
-            buildWall(5, 1.6, -16, 6, 3.2, 6, new THREE.MeshStandardMaterial({ color: 0x334155, transparent: true, opacity: 0.35 }));
-            buildWall(5, 1.4, -18.8, 1.5, 2.6, 0.2, new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+            addBox(5, 1.6, -16, 6, 3.2, 0.3, texConcrete, 1, 1, 1);
+            addBox(5, 1.4, -18.8, 1.5, 2.6, 0.2, texSolid, 0.13, 0.77, 0.36);
 
-            const smiler = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), makeTex('sign', ":)", "#000000", "#ffffff"));
-            smiler.position.set(3, 1.5, -6);
-            worldGroup.add(smiler);
+            const smilerTex = makeTex('sign', ":)", "#000000", "#ffffff");
+            const smiler = addBox(3, 1.5, -6, 0.7, 0.7, 0.1, smilerTex, 1, 1, 1);
 
-            activeLevelData = { ceilingLight, smiler, gateUnlocked: () => gateUnlocked, betaFinished: false };
+            levelState = { smiler, gateUnlocked: () => gateUnlocked, betaFinished: false };
             setSubtitle("Уровень 4: Подойдите к воротам, затем разрешите открытие на ПК в Хабе слева!");
         }
-        let gyroYaw = 0, gyroPitch = 0, gyroRoll = 0, yawOffset = 0;
         let sanity = 100, speedBoost = 0, heldItem = null, beltHasWater = false;
 
         window.addEventListener('deviceorientation', (e) => {
             if (e.alpha === null) return;
-            gyroYaw = THREE.MathUtils.degToRad(e.alpha);
-            gyroPitch = THREE.MathUtils.degToRad(e.beta - 90);
-            gyroRoll = THREE.MathUtils.degToRad(e.gamma);
+            gyroYaw = e.alpha * Math.PI / 180;
+            gyroPitch = (e.beta - 90) * Math.PI / 180;
+            gyroRoll = e.gamma * Math.PI / 180;
         });
 
         let drag = false, px = 0, py = 0;
@@ -770,74 +723,57 @@
 
             isBooted = true;
             loadMenuScene();
-
-            if (typeof startHandTracking === 'function') {
-                startHandTracking().catch(() => {});
-            }
+            startHandTracking().catch(() => {});
         }
 
-        function updateWorld() {
+        function updateLogic() {
             if (!isBooted) return;
-
             const totalYaw = gyroYaw + yawOffset;
-            camera.rotation.order = 'YXZ';
-            camera.rotation.y = totalYaw;
-            camera.rotation.x = Math.max(-1.3, Math.min(1.3, gyroPitch));
-            camera.rotation.z = -gyroRoll * 0.5;
 
-            const leanSide = Math.sin(gyroRoll) * 0.42;
-            const leanFwd = Math.max(-0.2, Math.sin(-gyroPitch) * 0.35);
-            const crouch = gyroPitch < -0.65 ? -0.65 : 0;
-            camera.position.set(
-                Math.cos(totalYaw) * leanSide - Math.sin(totalYaw) * leanFwd,
-                crouch - Math.abs(leanSide) * 0.15,
-                -Math.sin(totalYaw) * leanSide - Math.cos(totalYaw) * leanFwd
-            );
-
-            if (friendMesh.visible) {
-                friendMesh.position.lerp(friendMesh.userData.targetPos, 0.18);
-                friendMesh.rotation.y += (friendMesh.userData.targetYaw - friendMesh.rotation.y) * 0.18;
-                if (friendMesh.userData.isWalking) {
-                    friendMesh.userData.walkPhase += 0.15;
-                    const s = Math.sin(friendMesh.userData.walkPhase) * 0.45;
-                    friendMesh.userData.legL.rotation.x = s;
-                    friendMesh.userData.legR.rotation.x = -s;
-                }
+            if (friend.visible) {
+                friend.x += (friend.tx - friend.x) * 0.18;
+                friend.y += (friend.ty - friend.y) * 0.18;
+                friend.z += (friend.tz - friend.z) * 0.18;
+                friend.yaw += (friend.tyaw - friend.yaw) * 0.18;
+                if (friend.walking) friend.walk += 0.15;
             }
 
             if (!cursorMode && (leftGesture === "POINT" || leftGesture === "VICTORY")) {
                 const spd = (leftGesture === "VICTORY" ? 0.085 : 0.045) * (speedBoost > 0 ? 1.35 : 1.0);
-                playerRig.position.x -= Math.sin(totalYaw) * spd;
-                playerRig.position.z -= Math.cos(totalYaw) * spd;
+                player.x -= Math.sin(totalYaw) * spd;
+                player.z -= Math.cos(totalYaw) * spd;
             }
 
-            const handWorldPos = new THREE.Vector3();
-            rightHandMesh.getWorldPosition(handWorldPos);
-            for (let btn of interactiveButtons) {
+            const c = Math.cos(totalYaw), s = Math.sin(totalYaw);
+            const rHandX = player.x + rightHand.x * c + rightHand.z * s;
+            const rHandY = player.y + rightHand.y + Math.sin(gyroPitch) * (-rightHand.z);
+            const rHandZ = player.z - rightHand.x * s + rightHand.z * c;
+
+            for (let btn of buttons) {
                 if (btn.cooldown > 0) { btn.cooldown--; continue; }
-                const dist = handWorldPos.distanceTo(btn.mesh.position);
-                if (dist < 0.85 || (cursorMode && dist < 3.2 && rightGesture === "POINT")) {
+                const dist = Math.hypot(rHandX - btn.box.x, rHandY - btn.box.y, rHandZ - btn.box.z);
+                if (dist < 0.9 || (cursorMode && dist < 3.2 && rightGesture === "POINT")) {
                     btn.cooldown = 45;
-                    btn.action();
+                    btn.onClick();
                 }
             }
 
             if (rightGesture === "FIST" && !heldItem) {
-                for (let it of worldItems) {
-                    if (!it.taken && playerRig.position.distanceTo(it.mesh.position) < 2.2) {
-                        if (it.type === 'key' && currentState === "LEVEL_0" && activeLevelData.placed < 3) {
+                for (let it of items) {
+                    if (!it.taken && Math.hypot(player.x - it.box.x, player.z - it.box.z) < 2.2) {
+                        if (it.type === 'key' && currentState === "LEVEL_0" && levelState.placed < 3) {
                             setSubtitle("Слишком высоко! Сначала соберите 3 части лестницы под нишей.");
                             continue;
                         }
-                        it.taken = true; it.mesh.visible = false;
+                        it.taken = true; it.box.visible = false;
                         if (it.type === 'water') {
-                            heldItem = 'water'; beltHasWater = true; beltWater.visible = true;
+                            heldItem = 'water'; beltHasWater = true;
                             setSubtitle("Миндальная вода в руке! Поднесите руку близко к камере/рту, чтобы выпить.");
                         } else if (it.type === 'key' && currentState === "LEVEL_2") {
-                            activeLevelData.keysCollected++;
-                            setSubtitle(`Ключ собран (${activeLevelData.keysCollected}/5)!`);
+                            levelState.keysCollected++;
+                            setSubtitle(`Ключ собран (${levelState.keysCollected}/5)!`);
                         } else {
-                            heldItem = it.type; beltItem.visible = true;
+                            heldItem = it.type;
                             setSubtitle(it.type === 'ladder' ? "Часть лестницы на поясе! Раскройте ладонь 🖐️ под нишей." : "Ключ на поясе! Подойдите к двери.");
                         }
                         break;
@@ -846,43 +782,41 @@
             }
 
             if ((heldItem === 'water' || beltHasWater) && handNearMouth) {
-                heldItem = null; beltHasWater = false; beltWater.visible = false;
+                heldItem = null; beltHasWater = false;
                 sanity = Math.min(100, sanity + 45); speedBoost = 500;
                 setSubtitle("Вы выпили Миндальную воду! Рассудок восстановлен.");
             }
             if (currentState === "LEVEL_0") {
-                if (rightGesture === "OPEN" && heldItem === 'ladder' && Math.hypot(playerRig.position.x + 3.2, playerRig.position.z + 12.5) < 2.8) {
-                    activeLevelData.steps[activeLevelData.placed].visible = true;
-                    activeLevelData.placed++; heldItem = null; beltItem.visible = false;
-                    setSubtitle(`Ступенька установлена (${activeLevelData.placed}/3)!`);
+                if (rightGesture === "OPEN" && heldItem === 'ladder' && Math.hypot(player.x + 3.2, player.z + 12.5) < 2.8) {
+                    levelState.steps[levelState.placed].visible = true;
+                    levelState.placed++; heldItem = null;
+                    setSubtitle(`Ступенька установлена (${levelState.placed}/3)!`);
                 }
-                if (heldItem === 'key' && !activeLevelData.doorOpen && Math.hypot(playerRig.position.x + 1.5, playerRig.position.z + 13.0) < 2.2) {
-                    activeLevelData.doorOpen = true; heldItem = null; beltItem.visible = false;
-                    activeLevelData.door0.visible = false;
+                if (heldItem === 'key' && !levelState.doorOpen && Math.hypot(player.x + 1.5, player.z + 13.0) < 2.2) {
+                    levelState.doorOpen = true; heldItem = null;
+                    levelState.door0.visible = false;
                     setSubtitle("Дверь открыта! Впереди квадратная яма в полу...");
                 }
-                if (!activeLevelData.inPit && activeLevelData.doorOpen && Math.abs(playerRig.position.x) < 1.2 && Math.abs(playerRig.position.z + 18) < 1.2) {
-                    activeLevelData.inPit = true; playerRig.position.y = -2.35; activeLevelData.bac.visible = true;
+                if (!levelState.inPit && levelState.doorOpen && Math.abs(player.x) < 1.2 && Math.abs(player.z + 18) < 1.2) {
+                    levelState.inPit = true; player.y = -0.7; levelState.bac.visible = true;
                     setSubtitle("ВЫ УПАЛИ В ЯМУ! Бегите по стрелочкам от Бактерии к лестнице и вентиляции!");
                 }
-                if (activeLevelData.inPit) {
-                    const bx = playerRig.position.x - activeLevelData.bac.position.x;
-                    const bz = playerRig.position.z - activeLevelData.bac.position.z;
+                if (levelState.inPit) {
+                    const bx = player.x - levelState.bac.x, bz = player.z - levelState.bac.z;
                     const d = Math.hypot(bx, bz);
-                    if (d > 0.4) { activeLevelData.bac.position.x += (bx / d) * 0.04; activeLevelData.bac.position.z += (bz / d) * 0.04; }
-                    if (playerRig.position.x > 11.0) loadLevel1();
+                    if (d > 0.4) { levelState.bac.x += (bx / d) * 0.04; levelState.bac.z += (bz / d) * 0.04; }
+                    if (player.x > 11.0) loadLevel1();
                 }
-            } else if (currentState === "LEVEL_4" && !activeLevelData.betaFinished) {
+            } else if (currentState === "LEVEL_4" && !levelState.betaFinished) {
                 const lightOn = Math.sin(Date.now() * 0.002) > -0.2;
-                activeLevelData.ceilingLight.intensity = lightOn ? 1.1 : 0.05;
-                if (!lightOn && activeLevelData.gateUnlocked()) {
-                    const sx = playerRig.position.x - activeLevelData.smiler.position.x;
-                    const sz = playerRig.position.z - activeLevelData.smiler.position.z;
+                fogDensity = lightOn ? 0.04 : 0.14;
+                if (!lightOn && levelState.gateUnlocked()) {
+                    const sx = player.x - levelState.smiler.x, sz = player.z - levelState.smiler.z;
                     const sd = Math.hypot(sx, sz);
-                    if (sd > 0.5) { activeLevelData.smiler.position.x += (sx / sd) * 0.055; activeLevelData.smiler.position.z += (sz / sd) * 0.055; }
+                    if (sd > 0.5) { levelState.smiler.x += (sx / sd) * 0.055; levelState.smiler.z += (sz / sd) * 0.055; }
                 }
-                if (Math.hypot(playerRig.position.x - 5, playerRig.position.z + 18.5) < 1.5) {
-                    activeLevelData.betaFinished = true;
+                if (Math.hypot(player.x - 5, player.z + 18.5) < 1.5) {
+                    levelState.betaFinished = true;
                     document.getElementById('beta-end-screen').classList.add('visible');
                     setTimeout(returnToMenu, 6500);
                 }
@@ -890,30 +824,50 @@
 
             if (speedBoost > 0) speedBoost--;
             if (currentState.startsWith("LEVEL_")) sanity = Math.max(0, sanity - 0.006);
-            const ratio = sanity / 100;
-            rHandVis.userData.sanityBar.scale.x = Math.max(0.05, ratio);
-            rHandVis.userData.sanityMat.color.setHex(ratio > 0.5 ? 0x22c55e : (ratio > 0.25 ? 0xeab308 : 0xef4444));
-            document.getElementById('sanity-vignette').style.boxShadow = `inset 0 0 ${Math.floor((1 - ratio) * 130)}px rgba(0,0,0,0.95)`;
+            document.getElementById('sanity-vignette').style.boxShadow = `inset 0 0 ${Math.floor((1 - sanity / 100) * 130)}px rgba(0,0,0,0.95)`;
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            updateWorld();
-            const w = window.innerWidth, h = window.innerHeight;
+        function renderScene(eyeOffset, aspect, totalYaw, pitch) {
+            const leanSide = Math.sin(gyroRoll) * 0.42;
+            const leanFwd = Math.max(-0.2, Math.sin(-pitch) * 0.35);
+            const crouch = pitch < -0.65 ? -0.65 : 0;
+
+            const camX = player.x + Math.cos(totalYaw) * (leanSide + eyeOffset) - Math.sin(totalYaw) * leanFwd;
+            const camY = player.y + crouch - Math.abs(leanSide) * 0.15;
+            const camZ = player.z - Math.sin(totalYaw) * (leanSide + eyeOffset) - Math.cos(totalYaw) * leanFwd;
+
+            gl.uniform3f(uFogCol, fogColor[0], fogColor[1], fogColor[2]);
+            gl.uniform1f(uFogDen, fogDensity);
+            gl.clearColor(fogColor[0], fogColor[1], fogColor[2], 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            setCamView(camX, camY, camZ, totalYaw, pitch, gyroRoll, aspect);
+
+            for (let b of boxes) {
+                if (b.visible) drawBox(b.x, b.y, b.z, b.sx, b.sy, b.sz, b.rotY, b.tex, b.r, b.g, b.b, b.u, b.v);
+            }
+            if (friend.visible) drawFriendHazmat(friend.x, friend.y, friend.z, friend.yaw, friend.walk);
+            drawHandsAndBelt(camX, camY, camZ, totalYaw, pitch, sanity, beltHasWater, heldItem !== null && heldItem !== 'water', cursorMode);
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            updateLogic();
+            const totalYaw = gyroYaw + yawOffset;
+            const pitch = Math.max(-1.25, Math.min(1.25, gyroPitch));
+
             if (isStereo) {
-                const hw = w / 2;
-                camera.aspect = hw / h; camera.updateProjectionMatrix();
-                renderer.setViewport(0, 0, hw, h); renderer.setScissor(0, 0, hw, h);
-                camera.translateX(-0.032); renderer.render(scene, camera); camera.translateX(0.032);
-                renderer.setViewport(hw, 0, hw, h); renderer.setScissor(hw, 0, hw, h);
-                camera.translateX(0.032); renderer.render(scene, camera); camera.translateX(-0.032);
+                const hw = W / 2;
+                gl.viewport(0, 0, hw, H); gl.scissor(0, 0, hw, H);
+                renderScene(-0.032, hw / H, totalYaw, pitch);
+                gl.viewport(hw, 0, hw, H); gl.scissor(hw, 0, hw, H);
+                renderScene(0.032, hw / H, totalYaw, pitch);
             } else {
-                camera.aspect = w / h; camera.updateProjectionMatrix();
-                renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h);
-                renderer.render(scene, camera);
+                gl.viewport(0, 0, W, H); gl.scissor(0, 0, W, H);
+                renderScene(0, W / H, totalYaw, pitch);
             }
         }
-        animate();
+        loop();
     </script>
 </body>
 </html>
